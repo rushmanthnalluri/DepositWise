@@ -147,7 +147,7 @@ def test_metrics_endpoint_reports_aggregate_data_without_customer_features():
     metrics = response.json()
     assert "prediction_count" in metrics
     assert "mean_latency_ms" in metrics
-    assert metrics["drift_monitoring"] in {"not_configured", "numeric_psi"}
+    assert metrics["drift_monitoring"] in {"not_configured", "numeric_psi", "numeric_and_categorical_psi"}
     assert "raw customer features are not logged" in metrics["privacy_note"]
 
 
