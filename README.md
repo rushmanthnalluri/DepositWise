@@ -175,7 +175,7 @@ tests/             API and ML tests
 - Live dashboard metrics and feature importance are loaded from the generated model report rather than hardcoded in the interface.
 - CSV/XLSX upload profiling runs in memory and reports dimensions, column types, missing cells, duplicate rows, unique counts, and a sample preview.
 - Uploaded files are kept in a bounded in-memory cache only; they do not replace the bundled dataset or production model. Temporary profiles can be evicted when the cache is full or the service restarts.
-- Customer scoring calls the deployed model API and displays the estimated probability, selected threshold, and classification.
+- Customer scoring calls the deployed model API and displays the estimated probability, selected threshold, classification, and up to five single-feature baseline-sensitivity signals. These signals are explicitly not presented as causal effects or SHAP explanations.
 - Model evaluation shows held-out metrics, validation-threshold context, candidate comparison where present, top encoded feature importance, a calibration curve, and a confusion matrix.
 - Uploaded datasets can run feature inventory, descriptive statistics, missing-value analysis, numeric correlation summaries, and target-distribution analysis.
 - Binary-classification sandbox training can compare Logistic Regression, Random Forest, and Extra Trees; configure numeric mean/median imputation, categorical most-frequent/constant imputation, and numeric scaling; select a champion using validation average precision; tune its threshold on validation data; report held-out test metrics; and score an edited JSON customer profile. Sandbox models stay in memory and never replace the deployed champion.
@@ -186,7 +186,7 @@ tests/             API and ML tests
 
 The interface and core interaction patterns are being adapted from [PropPulse](https://github.com/rushmanthnalluri/prop-pulse) and [PlacementPredict](https://github.com/rushmanthnalluri/placement-predict), with banking-specific equivalents instead of property valuation or student salary functionality.
 
-**Not yet implemented:** persistent experiment tracking/model registry, per-prediction SHAP explanations, campaign lift and cost optimization, feature-value prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The current metrics endpoint deliberately retains only aggregate counts and latency, not raw customer features. The guided workbench now connects upload, profiling, EDA, sandbox training, evaluation, and sandbox scoring; preprocessing configuration and persistent run management remain future work.
+**Not yet implemented:** persistent experiment tracking/model registry, SHAP-based local explanations, campaign lift and cost optimization, feature-value prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The current metrics endpoint deliberately retains only aggregate counts and latency, not raw customer features. The guided workbench now connects upload, profiling, EDA, sandbox training, evaluation, and sandbox scoring; preprocessing configuration and persistent run management remain future work.
 
 ## Roadmap
 
