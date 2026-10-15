@@ -13,6 +13,7 @@ const stages = [
   {title:"Score a customer",desc:"Submit a profile to the deployed inference API.",bullets:["Enter pre-call customer and campaign attributes","Get probability and threshold-based classification","Treat the output as decision support, not a guarantee"],view:"prediction"}
 ];
 let report = null;
+let activeDatasetId = null;
 let currentStage = 0;
 
 function showView(name, label) {
@@ -121,12 +122,29 @@ async function uploadDataset(file){
  catch(e){$("#upload-error").textContent=e.message;$("#upload-error").hidden=false;$("#upload-filename").textContent=file.name;}
 }
 function renderProfile(data){
+ activeDatasetId=data.dataset_id||null;
  const cols=data.columns||[];const sample=data.sample||[];
  const summary=`<div class="profile-summary"><div class="profile-chip"><small>Rows</small><strong>${Number(data.rows).toLocaleString()}</strong></div><div class="profile-chip"><small>Columns</small><strong>${data.column_count}</strong></div><div class="profile-chip"><small>Missing cells</small><strong>${Number(data.missing_cells).toLocaleString()}</strong></div><div class="profile-chip"><small>Duplicate rows</small><strong>${Number(data.duplicate_rows).toLocaleString()}</strong></div><div class="profile-chip"><small>Numeric fields</small><strong>${data.numeric_columns}</strong></div><div class="profile-chip"><small>Categorical fields</small><strong>${data.categorical_columns}</strong></div></div>`;
  const table=`<div class="table-wrap"><table><thead><tr><th>Column</th><th>Type</th><th>Missing</th><th>Unique</th></tr></thead><tbody>${cols.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.dtype)}</td><td>${c.missing}</td><td>${c.unique}</td></tr>`).join("")}</tbody></table></div>`;
  const targetSummary=data.target_summary?'<div class="panel" style="margin:14px 0"><div class="eyebrow">TARGET DISTRIBUTION · '+esc(data.target_summary.column)+'</div><div class="feature-list" style="margin-top:12px">'+Object.entries(data.target_summary.counts).map(([label,count])=>'<div class="detail-row"><span>'+esc(label)+'</span><strong>'+Number(count).toLocaleString()+'</strong></div>').join("")+'</div></div>':"";
  const sampleTable=sample.length?`<div class="sample-table-wrap"><table class="sample-table"><thead><tr>${Object.keys(sample[0]).map(k=>`<th>${esc(k)}</th>`).join("")}</tr></thead><tbody>${sample.slice(0,8).map(row=>`<tr>${Object.values(row).map(v=>`<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:"";
- $("#profile-output").innerHTML=`<div class="panel-header"><div><div class="eyebrow">UPLOAD PROFILE</div><h2>${esc(data.filename)}</h2></div><span class="pill pill-green">Profile generated</span></div>${summary}${targetSummary}<h3>Column inventory</h3>${table}<h3>Sample records</h3>${sampleTable}<p class="muted-copy">This is a temporary exploratory profile. The uploaded file is not saved as the production dataset and does not retrain or replace the live model.</p>`;
+ $("#profile-output").innerHTML=`<div class="panel-header"><div><div class="eyebrow">UPLOAD PROFILE</div><h2>${esc(data.filename)}</h2></div><span class="pill pill-green">Profile generated</span></div>${summary}${targetSummary}<h3>Column inventory</h3>${table}<h3>Sample records</h3>${sampleTable}<div class="profile-actions"><button class="button button-secondary" data-profile-action="features">Feature inventory</button><button class="button button-secondary" data-profile-action="statistics">Descriptive stats</button><button class="button button-secondary" data-profile-action="missing">Missing values</button><button class="button button-secondary" data-profile-action="visualization">Correlations & target</button></div><div id="profile-insights"></div><p class="muted-copy">This is a temporary exploratory profile. The uploaded file is not saved as the production dataset and does not retrain or replace the live model.</p>`;
  $("#profile-output").hidden=false;
+ $("[data-profile-action]").forEach(button=>button.addEventListener("click",()=>loadProfileInsight(button.dataset.profileAction)));
+}
+async function loadProfileInsight(action){
+ if(!activeDatasetId){return;}
+ const output=$("#profile-insights");output.innerHTML='<div class="empty-state">Loading analysis…</div>';
+ try{
+  const res=await fetch(`/workflow/${encodeURIComponent(activeDatasetId)}/${action}`);
+  const data=await res.json();if(!res.ok)throw new Error(data.detail||"Analysis unavailable");
+  let title=action==="features"?"Feature inventory":action==="statistics"?"Descriptive statistics":action==="missing"?"Missing-value analysis":"Correlations and target distribution";
+  let body="";
+  if(action==="features")body='<div class="table-wrap"><table><thead><tr><th>Column</th><th>Type</th><th>Role</th><th>Missing</th><th>Unique</th></tr></thead><tbody>'+data.columns.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.dtype)+'</td><td>'+esc(x.role)+'</td><td>'+x.missing+'</td><td>'+x.unique+'</td></tr>').join("")+'</tbody></table></div>';
+  if(action==="statistics")body=data.statistics.length?'<div class="table-wrap"><table><thead><tr>'+Object.keys(data.statistics[0]).map(k=>'<th>'+esc(k)+'</th>').join("")+'</tr></thead><tbody>'+data.statistics.map(row=>'<tr>'+Object.values(row).map(v=>'<td>'+esc(v==null?"—":v)+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>':'<p class="muted-copy">No numeric columns were detected.</p>';
+  if(action==="missing")body='<p class="muted-copy">'+Number(data.missing_cells).toLocaleString()+' missing cells · '+Number(data.duplicate_rows).toLocaleString()+' duplicate rows</p><div class="table-wrap"><table><thead><tr><th>Column</th><th>Missing</th><th>Missing %</th></tr></thead><tbody>'+data.columns.map(x=>'<tr><td>'+esc(x.column)+'</td><td>'+x.missing+'</td><td>'+pct(x.missing_fraction,1)+'</td></tr>').join("")+'</tbody></table></div>';
+  if(action==="visualization"){const t=data.target_distribution;body=(t?'<h3>Target distribution · '+esc(t.column)+'</h3><div class="feature-list">'+t.labels.map((label,i)=>'<div class="detail-row"><span>'+esc(label)+'</span><strong>'+Number(t.counts[i]).toLocaleString()+'</strong></div>').join("")+'</div>':'<p class="muted-copy">No conventional target column (y/target/subscribed/subscription) was detected.</p>')+'<h3>Strongest numeric correlations</h3>'+(data.top_numeric_correlations.length?'<div class="table-wrap"><table><thead><tr><th>Feature A</th><th>Feature B</th><th>Correlation</th></tr></thead><tbody>'+data.top_numeric_correlations.slice(0,15).map(x=>'<tr><td>'+esc(x.feature_a)+'</td><td>'+esc(x.feature_b)+'</td><td>'+fmt(x.correlation,3)+'</td></tr>').join("")+'</tbody></table></div>':'<p class="muted-copy">At least two numeric columns are needed for correlations.</p>');}
+  output.innerHTML='<div class="panel" style="margin-top:16px"><div class="panel-header"><div><div class="eyebrow">DATASET ANALYSIS</div><h2>'+title+'</h2></div><span class="pill pill-green">Computed live</span></div>'+body+'</div>';
+ }catch(error){output.innerHTML='<div class="error-message">'+esc(error.message)+'</div>';}
 }
 renderStage();loadHealth();loadReport();
