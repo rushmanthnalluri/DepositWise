@@ -19,6 +19,7 @@ reports/generated/*
 reports/figures/*
 !reports/figures/.gitkeep
 mlruns/
+logs/
 .DS_Store
 node_modules/
 dist/
