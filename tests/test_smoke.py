@@ -103,7 +103,7 @@ def test_sandbox_training_and_prediction_do_not_touch_production_model():
         rows.append(f"{20 + i},{100 + i * 3},{label}")
     upload = client.post(
         "/dataset/profile",
-        files={"file": ("small-campaign.csv", ("\\n".join(rows) + "\\n").encode(), "text/csv")},
+        files={"file": ("small-campaign.csv", ("\n".join(rows) + "\n").encode(), "text/csv")},
     )
     assert upload.status_code == 200
     dataset_id = upload.json()["dataset_id"]
