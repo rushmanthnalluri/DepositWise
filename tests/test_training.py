@@ -1,8 +1,9 @@
+import numpy as np
 import pandas as pd
 import pytest
 from sklearn.linear_model import LogisticRegression
 
-from ml.train import build_categorical_feature_reference, build_numeric_feature_reference, build_pipeline, read_dataset
+from ml.train import build_categorical_feature_reference, build_numeric_feature_reference, build_pipeline, evaluate_subgroups, read_dataset
 
 
 def test_read_dataset_accepts_semicolon_delimited_csv(tmp_path):
@@ -73,3 +74,18 @@ def test_categorical_feature_reference_is_bounded_and_normalized():
     assert "__OTHER__" in item["labels"]
     assert len(item["labels"]) == len(item["proportions"])
     assert sum(item["proportions"]) == pytest.approx(1.0)
+
+
+def test_subgroup_evaluation_reports_descriptive_group_metrics():
+    frame = pd.DataFrame({
+        "age": [25] * 60 + [55] * 60,
+        "marital": ["single"] * 60 + ["married"] * 60,
+        "education": ["secondary"] * 120,
+    })
+    truth = pd.Series([0, 1] * 60)
+    probabilities = np.asarray([0.7 if label else 0.2 for label in truth])
+    result = evaluate_subgroups(frame, truth, probabilities, threshold=0.5, minimum_group_size=20)
+    assert result["metrics"]
+    assert {item["feature"] for item in result["metrics"]} >= {"age_band", "marital"}
+    assert all(item["count"] >= 20 for item in result["metrics"])
+    assert "not a legal fairness certification" in result["caveat"]
