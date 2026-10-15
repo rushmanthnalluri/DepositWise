@@ -33,3 +33,14 @@ def test_predict_without_model_is_service_unavailable_when_artifact_missing():
     if not MODEL_PATH.exists():
         response = client.post("/predict", json={"customer": {"age": 35}})
         assert response.status_code == 503
+
+
+def test_model_info_is_explicit_when_report_is_missing():
+    from backend.app.main import REPORT_PATH
+
+    response = client.get("/model-info")
+    if REPORT_PATH.exists():
+        assert response.status_code == 200
+        assert "selected_model" in response.json()
+    else:
+        assert response.status_code == 404
