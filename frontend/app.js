@@ -39,7 +39,7 @@ form.addEventListener('submit', async (event) => {
     resultContent.hidden = false;
     document.querySelector('#probability-value').textContent = percentage;
     document.querySelector('#meter-fill').style.width = `${percentage}%`;
-    document.querySelector('#outcome').textContent = data.predicted_subscription ? 'Above baseline threshold' : 'Below baseline threshold';
+    document.querySelector('#outcome').textContent = data.predicted_subscription ? 'Above selected threshold' : 'Below selected threshold';
     document.querySelector('#outcome').classList.toggle('negative', !data.predicted_subscription);
     document.querySelector('#threshold-value').textContent = `${(Number(data.threshold) * 100).toFixed(0)}%`;
     document.querySelector('#model-status').textContent = 'Prediction returned';
