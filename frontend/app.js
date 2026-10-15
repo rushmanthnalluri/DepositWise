@@ -87,6 +87,15 @@ async function loadHealth(){
   $("#health-api").textContent=data.status==="ok"?"Online":"Unavailable";$("#health-model").textContent=loaded?"Available":"Missing";
   $("#health-badge").textContent=loaded?"Service available":"Model unavailable";$("#health-badge").className="pill "+(loaded?"pill-green":"pill-amber");
   $("#health-checks").innerHTML=[["API liveness",data.status==="ok"?"Passing":"Unavailable"],["Model artifact",loaded?"Available":"Missing"],["Prediction endpoint","Configured"],["Prediction logging","Not configured"],["Drift monitoring","Not configured"]].map(([a,b])=>`<div class="check-row"><span>${a}</span><span class="check-state ${["Not configured","Missing","Unavailable"].includes(b)?"warn":""}">${b}</span></div>`).join("");
+  try{
+   const metricsResponse=await fetch("/metrics",{cache:"no-store"});
+   if(metricsResponse.ok){
+    const metrics=await metricsResponse.json();
+    $("#health-prediction-count").textContent=Number(metrics.prediction_count||0).toLocaleString();
+    $("#health-checks").innerHTML += [["Recent prediction samples",String(metrics.recent_sample_count)],["Mean inference latency",metrics.mean_latency_ms==null?"No samples":fmt(metrics.mean_latency_ms,2)+" ms"],["Last successful prediction",metrics.last_prediction_at||"No predictions yet"],["Feature drift monitoring",metrics.drift_monitoring==="not_configured"?"Not configured":"Available"]].map(([a,b])=>'<div class="check-row"><span>'+esc(a)+'</span><span class="check-state '+(b==="Not configured"?"warn":"")+'">'+esc(b)+'</span></div>').join("");
+   }
+  }catch(_){}
+
  }catch(e){$("#api-status").textContent="API connection unavailable";$("#sidebar-health").textContent="API unavailable";$("#sidebar-status").classList.remove("online");$("#health-api").textContent="Unavailable";}
 }
 async function loadReport(){
