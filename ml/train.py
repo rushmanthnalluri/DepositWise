@@ -225,7 +225,7 @@ def evaluate_subgroups(X: pd.DataFrame, y_true, probabilities, threshold: float,
     return {
         "minimum_group_size": minimum_group_size,
         "metrics": results,
-        "caveat": "Descriptive subgroup diagnostics only. Differences may reflect sampling, base rates, or model error; review context and legal requirements before use.",
+        "caveat": "Descriptive subgroup diagnostics only, not a legal fairness certification. Differences may reflect sampling, base rates, or model error; review context and legal requirements before use.",
     }
 
 
