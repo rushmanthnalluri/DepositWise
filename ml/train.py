@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from sklearn.calibration import calibration_curve
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -96,7 +96,7 @@ def build_pipeline(X: pd.DataFrame, classifier) -> Pipeline:
     numeric = X.select_dtypes(include=["number"]).columns.tolist()
     categorical = [column for column in X.columns if column not in numeric]
     numeric_pipe = Pipeline([("imputer", SimpleImputer(strategy="median")), ("scale", StandardScaler())])
-    categorical_pipe = Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("encode", OneHotEncoder(handle_unknown="ignore"))])
+    categorical_pipe = Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("encode", OneHotEncoder(handle_unknown="ignore", sparse_output=False))])
     prep = ColumnTransformer([("numeric", numeric_pipe, numeric), ("categorical", categorical_pipe, categorical)])
     return Pipeline([("preprocess", prep), ("classifier", classifier)])
 
@@ -179,6 +179,7 @@ def main() -> None:
         "logistic_regression": LogisticRegression(max_iter=2000, class_weight="balanced", random_state=RANDOM_STATE),
         "random_forest": RandomForestClassifier(n_estimators=150, min_samples_leaf=2, class_weight="balanced_subsample", n_jobs=-1, random_state=RANDOM_STATE),
         "extra_trees": ExtraTreesClassifier(n_estimators=150, min_samples_leaf=2, class_weight="balanced", n_jobs=-1, random_state=RANDOM_STATE),
+        "gradient_boosting": GradientBoostingClassifier(n_estimators=120, learning_rate=0.05, max_depth=2, random_state=RANDOM_STATE),
     }
     comparison = []
     fitted = {}
