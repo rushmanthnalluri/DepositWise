@@ -99,7 +99,13 @@ def compute_psi(reference: list[float], observed: list[float]) -> float:
 
 @app.get("/metrics")
 def metrics() -> dict[str, Any]:
-    latencies = list(PREDICTION_LATENCIES)
+    global FEATURE_REFERENCE
+    if not FEATURE_REFERENCE and MODEL_PATH.exists():
+        try:
+            FEATURE_REFERENCE = joblib.load(MODEL_PATH).get("feature_reference", {})
+        except Exception:
+            FEATURE_REFERENCE = {}
+    latencies = list(PREDICTION_LATENCIES
     drift_features = []
     for feature, reference in FEATURE_REFERENCE.items():
         counts = LIVE_FEATURE_COUNTS.get(feature, [])
