@@ -182,7 +182,7 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
                     raise HTTPException(status_code=413, detail="Excel file expands beyond the 100 MB safety limit.")
             frame = pd.read_excel(io.BytesIO(raw), engine="openpyxl")
         else:
-            frame = pd.read_csv(io.BytesIO(raw), low_memory=False)
+            frame = pd.read_csv(io.BytesIO(raw), sep=None, engine="python")
     except HTTPException:
         raise
     except Exception as exc:
