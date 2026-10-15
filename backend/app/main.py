@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT / "frontend"
 MODEL_PATH = Path(os.getenv("DEPOSITWISE_MODEL_PATH", ROOT / "models/depositwise_model.joblib"))
+REPORT_PATH = ROOT / "reports/generated/model_comparison.json"
 app = FastAPI(title="DepositWise API", description="Term-deposit subscription propensity prediction for educational use.", version="0.2.0")
 
 class PredictionRequest(BaseModel):
@@ -34,6 +35,25 @@ def dashboard() -> HTMLResponse:
     page = page.replace('<script src="/static/app.js" defer></script>', "")
     page = page.replace("</body>", f"<script>{script}</script></body>")
     return HTMLResponse(content=page)
+
+@app.get("/model-info")
+def model_info() -> dict[str, Any]:
+    """Expose the actual evaluation report generated during training."""
+    if not REPORT_PATH.exists():
+        raise HTTPException(status_code=404, detail="Evaluation report is not available yet.")
+    try:
+        report = __import__("json").loads(REPORT_PATH.read_text(encoding="utf-8"))
+        return {
+            "selected_model": report.get("selected_model"),
+            "rows": report.get("rows"),
+            "selection_metric": report.get("selection_metric"),
+            "validation_model_comparison": report.get("validation_model_comparison", []),
+            "final_test_metrics": report.get("final_test_metrics"),
+            "excluded_features": report.get("excluded_features", []),
+            "limitations": report.get("limitations", []),
+        }
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail="Evaluation report could not be read.") from exc
 
 @app.post("/predict")
 def predict(request: PredictionRequest) -> dict[str, Any]:
