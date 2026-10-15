@@ -2,7 +2,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const views = ["overview","prediction","dataset","models","evaluation","monitoring","workflow"];
 const stages = [
-  {title:"Upload and validate dataset",desc:"Start with the official Bank Marketing dataset or inspect a CSV/XLSX of your own.",bullets:["Check accepted file format and schema","Inspect dimensions and sample rows","Keep exploratory uploads separate from the deployed model"],view:"dataset"},
+  {title:"Upload and validate dataset",desc:"Start with the official Bank Marketing dataset or inspect a CSV of your own.",bullets:["Check accepted file format and schema","Inspect dimensions and sample rows","Keep exploratory uploads separate from the deployed model"],view:"dataset"},
   {title:"Feature inventory",desc:"Understand which columns are available and how each field should be interpreted.",bullets:["Inspect column names and inferred data types","Identify target and post-outcome fields","Exclude duration from pre-call predictions"],view:"dataset"},
   {title:"Descriptive statistics",desc:"Summarize distributions before modelling.",bullets:["Review numeric ranges and central tendency","Compare customer and campaign characteristics","Check unusual values and high-cardinality categories"],view:"dataset"},
   {title:"Missing-value analysis",desc:"Measure data completeness and choose defensible handling policies.",bullets:["Count missing values by column","Inspect duplicate records","Avoid fitting imputation statistics on the test set"],view:"dataset"},
