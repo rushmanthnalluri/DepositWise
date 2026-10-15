@@ -120,8 +120,8 @@ $("#refresh-health").addEventListener("click",()=>{loadHealth();loadReport();});
 const form=$("#prediction-form");
 form.addEventListener("submit",async event=>{
  event.preventDefault();const btn=$("#submit-button");const error=$("#result-error");error.hidden=true;btn.disabled=true;btn.innerHTML="Scoring customer…";
- const values=Object.fromEntries(new FormData(form).entries());for(const k of ["age","balance","day","campaign","pdays","previous"])values[k]=Number(values[k]);
- try{const res=await fetch("/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({customer:values,threshold:Number($("#threshold-control").value)/100})});const data=await res.json();if(!res.ok)throw new Error(data.detail||"Prediction failed");
+ const values=Object.fromEntries(new FormData(form).entries());const selectedModel=values.model||null;delete values.model;for(const k of ["age","balance","day","campaign","pdays","previous"])values[k]=Number(values[k]);
+ try{const res=await fetch("/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({customer:values,model:selectedModel,threshold:Number($("#threshold-control").value)/100})});const data=await res.json();if(!res.ok)throw new Error(data.detail||"Prediction failed");
  const probability=Math.max(0,Math.min(1,Number(data.subscription_probability)));const percentage=(probability*100).toFixed(1);lastProbability=probability;updateEconomics();$("#result-empty").hidden=true;$("#result-content").hidden=false;$("#probability-value").textContent=percentage;$("#meter-fill").style.width=percentage+"%";
  $("#outcome").textContent=data.predicted_subscription?"Above selected threshold":"Below selected threshold";$("#outcome").classList.toggle("negative",!data.predicted_subscription);$("#threshold-value").textContent=pct(data.threshold,0);$("#prediction-model").textContent=data.selected_model||"Current champion";$("#result-note").textContent=data.note||"Estimate returned by the current model.";
  const impacts=data.top_feature_impacts||[];
