@@ -110,12 +110,15 @@ def test_sandbox_training_and_prediction_do_not_touch_production_model():
 
     trained = client.post(
         f"/workflow/{dataset_id}/train",
-        json={"target": "y", "models": ["logistic_regression"], "row_limit": 20000},
+        json={"target": "y", "models": ["logistic_regression"], "row_limit": 20000, "numeric_imputation": "mean", "categorical_imputation": "constant", "scale_numeric": False},
     )
     assert trained.status_code == 200
     result = trained.json()
     assert result["sandbox_only"] is True
     assert result["selected_model"] == "logistic_regression"
+    assert result["preprocessing_config"]["numeric_imputation"] == "mean"
+    assert result["preprocessing_config"]["categorical_imputation"] == "constant"
+    assert result["preprocessing_config"]["scale_numeric"] is False
     assert "final_test_metrics" in result
 
     prediction = client.post(
