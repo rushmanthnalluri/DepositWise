@@ -128,3 +128,13 @@ def test_sandbox_training_and_prediction_do_not_touch_production_model():
     assert prediction.status_code == 200
     assert prediction.json()["sandbox_only"] is True
     assert 0 <= prediction.json()["subscription_probability"] <= 1
+
+
+def test_metrics_endpoint_reports_aggregate_data_without_customer_features():
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    metrics = response.json()
+    assert "prediction_count" in metrics
+    assert "mean_latency_ms" in metrics
+    assert metrics["drift_monitoring"] == "not_configured"
+    assert "raw customer features are not logged" in metrics["privacy_note"]
