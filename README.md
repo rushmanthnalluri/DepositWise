@@ -25,7 +25,9 @@ The free Render service may sleep when idle. The Docker build downloads the publ
 - EDA profile output with class balance, duplicates, missing-value counts, and a target-distribution chart.
 - Leakage-aware preprocessing for numeric and categorical features.
 - Comparison of Logistic Regression, Random Forest, and Extra Trees.
-- Model selection by validation average precision, with ROC-AUC, precision, recall, and F1 reported for each candidate.
+- Model selection by validation average precision, with ROC-AUC, precision, recall, F1, balanced accuracy, Brier score, and confusion matrix reporting.
+- Decision-threshold tuning by validation F1, with the untouched test set evaluated at both the baseline and tuned thresholds.
+- Test-set calibration curve and model-based encoded-feature importance, exposed through `/model-info`.
 - FastAPI health and prediction endpoints.
 - Responsive browser workbench served at `/dashboard`, connected to the prediction API.
 - Automated tests and a GitHub Actions workflow for Python 3.11 and 3.12.
@@ -36,7 +38,7 @@ The free Render service may sleep when idle. The Docker build downloads the publ
 - `duration` is excluded because call duration is only known after contact. The model is intended for pre-call targeting.
 - Preprocessing is fitted within each model pipeline, after the train/validation split.
 - The dataset is split into training, validation, and a separate test set. Candidate selection uses validation average precision; the selected model is then refit on train+validation and evaluated once on the held-out test set.
-- The default probability threshold of 0.5 is a baseline. Choose a threshold against an explicit campaign cost/benefit objective before deployment.
+- The model selects a decision threshold by validation F1; it is not yet optimized for campaign costs, contact capacity, or profit. The test set is not used to select the threshold.
 - Model outputs are estimates, not guarantees. Review privacy, consent, fairness, and applicable marketing/banking requirements before real-world use.
 
 ## Setup
@@ -168,9 +170,8 @@ tests/             API and ML tests
 
 ## Roadmap
 
-- Add threshold selection based on campaign economics.
-- Add confusion matrix, calibration checks, feature explanations, and drift monitoring.
-- Add temporal validation to test generalization to future campaigns.
+- Tune the threshold against a documented campaign cost/benefit objective and evaluate business lift.
+- Add subgroup/fairness checks, feature-drift monitoring, and temporal validation for future campaigns.
 
 ## References
 
