@@ -1,94 +1,173 @@
 # DepositWise
 
-**DepositWise** is an end-to-end machine-learning project for predicting whether a customer will subscribe to a term deposit following a bank marketing campaign.
+**DepositWise** is an end-to-end machine-learning project that estimates whether a customer may subscribe to a term deposit after a bank marketing campaign. It is designed as a portfolio project with reproducible experiments, an inference API, and transparent model evaluation.
 
-It adapts engineering ideas from [PropPulse](https://github.com/rushmanthnalluri/prop-pulse)—reproducible pipelines, leakage-aware evaluation, model comparison, explainability, API serving, monitoring and a guided workbench—to a binary-classification banking problem.
+It borrows engineering ideas from [PropPulse](https://github.com/rushmanthnalluri/prop-pulse), adapting them to binary classification and marketing-campaign data.
 
 ## Dataset
 
-[Kaggle: Banking Dataset — Marketing Targets](https://www.kaggle.com/datasets/prakharrathi25/banking-dataset-marketing-targets)
+Use the [Kaggle Banking Dataset — Marketing Targets](https://www.kaggle.com/datasets/prakharrathi25/banking-dataset-marketing-targets). Download the labeled `bank-full.csv` file and put it at `data/raw/bank-full.csv`. The loader auto-detects common comma- and semicolon-delimited CSV files and expects the target column `y` with `yes`/`no` labels.
 
-Download the dataset from Kaggle and place the supplied CSV files under `data/raw/`. Do not commit credentials or private customer data. Check the dataset's terms before redistribution.
+Do not commit downloaded data, customer records, credentials, model artifacts, or generated reports. Check the dataset's terms before redistributing it.
 
-The common dataset release uses `y` as the target (whether the client subscribed to a term deposit). Confirm the actual column names and train/test format from the downloaded files before running the pipeline.
+## Current capabilities
 
-## Project goals
-
-- Explore customer and campaign attributes and document class imbalance.
-- Build leakage-safe preprocessing for numeric and categorical fields.
-- Establish a Logistic Regression baseline and compare tree-based classifiers.
-- Evaluate using stratified validation and metrics suited to imbalanced classification: PR-AUC, ROC-AUC, precision, recall, F1, confusion matrix and probability calibration.
-- Select a decision threshold using validation data and an explicit business objective.
-- Explain predictions with feature importance and, where appropriate, SHAP.
-- Expose prediction and model-health endpoints through FastAPI.
-- Add a responsive dashboard, automated tests, CI, Docker support and monitoring as the project matures.
+- CSV loading, delimiter detection, and target validation.
+- EDA profile output with class balance, duplicates, missing-value counts, and a target-distribution chart.
+- Leakage-aware preprocessing for numeric and categorical features.
+- Comparison of Logistic Regression, Random Forest, and Extra Trees.
+- Model selection by validation average precision, with ROC-AUC, precision, recall, and F1 reported for each candidate.
+- FastAPI health and prediction endpoints.
+- Automated tests and a GitHub Actions workflow for Python 3.11 and 3.12.
+- Dockerfile for API containerization.
 
 ## Important modeling safeguards
 
-- Treat `duration` carefully: call duration is only known after a call. Exclude it from a pre-call targeting model, or label a duration-inclusive model explicitly as post-call analysis.
-- Fit imputation, encoding, scaling, feature selection and resampling only within training folds.
-- Keep the final test set untouched until model and threshold selection are complete.
-- Do not report fabricated metrics. Results belong in reports only after the corresponding experiment has run.
-- Predictions are decision support, not guarantees of customer behavior. Review fairness, privacy, consent and applicable banking/marketing requirements before real-world use.
+- `duration` is excluded because call duration is only known after contact. The model is intended for pre-call targeting.
+- Preprocessing is fitted within each model pipeline, after the train/validation split.
+- The current comparison uses one stratified validation split. It is for model selection, **not** an independent final test result.
+- The default probability threshold of 0.5 is a baseline. Choose a threshold against an explicit campaign cost/benefit objective before deployment.
+- Model outputs are estimates, not guarantees. Review privacy, consent, fairness, and applicable marketing/banking requirements before real-world use.
 
-## Intended architecture
-
-```text
-Kaggle CSVs
-    -> validation and EDA
-    -> leakage-aware feature pipeline
-    -> baseline and candidate model training
-    -> validation-based model/threshold selection
-    -> versioned model artifact and evaluation report
-    -> FastAPI prediction service
-    -> React dashboard / ML workbench
-    -> tests, CI, Docker and drift monitoring
-```
-
-## Repository layout
-
-```text
-DepositWise/
-├── backend/             # FastAPI application
-├── frontend/            # Web dashboard (planned)
-├── ml/
-│   ├── data/             # Dataset validation and split helpers
-│   ├── features/         # Preprocessing pipeline
-│   ├── training/         # Model training and comparison
-│   ├── evaluation/       # Metrics and threshold selection
-│   └── explainability/   # Feature explanations
-├── data/raw/             # Downloaded data; ignored by Git
-├── models/               # Generated model artifacts; ignored by Git
-├── notebooks/            # EDA notebooks
-├── reports/              # Reproducible experiment reports
-├── tests/
-├── requirements.txt
-├── .env.example
-└── README.md
-```
-
-## Quick start
+## Setup
 
 Python 3.11 or newer is recommended.
 
 ```bash
+git clone https://github.com/rushmanthnalluri/DepositWise.git
+cd DepositWise
 python -m venv .venv
-# Windows PowerShell:
-.venv\\Scripts\\Activate.ps1
-# macOS/Linux:
-source .venv/bin/activate
-
-python -m pip install -r requirements.txt
 ```
 
-Dataset-specific commands and API run instructions will be added alongside the implementation. Never place API keys in source control.
+Activate the environment:
+
+```powershell
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+```
+
+```bash
+# macOS/Linux
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+## Run EDA and training
+
+Place the labeled CSV at `data/raw/bank-full.csv`, then run:
+
+```bash
+python -m ml.eda
+python -m ml.train
+```
+
+EDA outputs are written to `reports/generated/data_profile.json` and `reports/figures/target_distribution.png`. Model comparison results are written to `reports/generated/model_comparison.json`. The selected pipeline is saved to `models/depositwise_model.joblib`. These generated files are intentionally ignored by Git.
+
+To use another dataset path:
+
+```bash
+# macOS/Linux
+export DEPOSITWISE_DATA_PATH=/absolute/path/to/bank-full.csv
+python -m ml.train
+```
+
+```powershell
+# Windows PowerShell
+$env:DEPOSITWISE_DATA_PATH = "C:\path\to\bank-full.csv"
+python -m ml.train
+```
+
+## Run the API
+
+Train the model first, then run:
+
+```bash
+uvicorn backend.app.main:app --reload
+```
+
+- Health: http://127.0.0.1:8000/health
+- Interactive API docs: http://127.0.0.1:8000/docs
+
+Example request body for `POST /predict` (use feature names from the dataset):
+
+```json
+{
+  "customer": {
+    "age": 35,
+    "job": "management",
+    "marital": "married",
+    "education": "tertiary",
+    "default": "no",
+    "balance": 1200,
+    "housing": "yes",
+    "loan": "no",
+    "contact": "cellular",
+    "day": 15,
+    "month": "may",
+    "campaign": 1,
+    "pdays": -1,
+    "previous": 0,
+    "poutcome": "unknown"
+  }
+}
+```
+
+The example is illustrative; use the exact feature columns and valid values from the downloaded dataset. The API returns a probability and a baseline threshold classification.
+
+## Tests and CI
+
+Run tests locally:
+
+```bash
+pytest -q
+```
+
+GitHub Actions runs the test suite on pushes to `main`, pull requests, and manual dispatches. Check the [Actions page](https://github.com/rushmanthnalluri/DepositWise/actions) for actual run results; a workflow being configured does not mean it has passed.
+
+## Docker
+
+Build the API image after training the model locally:
+
+```bash
+docker build -t depositwise .
+docker run --rm -p 8000:8000 -v "$(pwd)/models:/app/models:ro" depositwise
+```
+
+On Windows PowerShell, replace the volume argument with `-v "${PWD}/models:/app/models:ro"`. The model artifact is not baked into the image. The mounted `models/depositwise_model.joblib` must exist, or the API will report that prediction is unavailable.
+
+## Repository structure
+
+```text
+backend/app/       FastAPI service
+ml/train.py        model comparison and artifact creation
+ml/eda.py          dataset profiling and target plot
+data/raw/          local input CSVs (ignored)
+models/            generated model artifacts (ignored)
+reports/generated/ generated JSON reports (ignored)
+reports/figures/   generated plots (ignored)
+tests/             API and ML tests
+.github/workflows/ GitHub Actions CI
+```
+
+## Roadmap
+
+- Add a separate untouched test set and threshold selection based on campaign economics.
+- Add confusion matrix, calibration checks, feature explanations, and drift monitoring.
+- Build a responsive browser dashboard and connect it to the API.
+- Deploy the API and dashboard after model artifact storage and environment configuration are decided.
 
 ## References
 
-- [Banking Dataset — Marketing Targets (Kaggle)](https://www.kaggle.com/datasets/prakharrathi25/banking-dataset-marketing-targets)
+- [Kaggle Banking Dataset — Marketing Targets](https://www.kaggle.com/datasets/prakharrathi25/banking-dataset-marketing-targets)
 - [PropPulse](https://github.com/rushmanthnalluri/prop-pulse)
-- [PlacementPredict](https://github.com/rushmanthnalluri/PlacementPredict) (verify the repository URL/access before using it as a source)
+- [PlacementPredict](https://github.com/rushmanthnalluri/PlacementPredict) (repository access was not verified in this session)
 
 ## Status
 
-Initial project scaffold. Model metrics, deployment status and production readiness are not claimed until verified by running the implementation and CI.
+The starter implementation and CI configuration are committed. The dataset has not been added, and model training, deployment, and passing CI status must not be claimed until verified from actual runs.
