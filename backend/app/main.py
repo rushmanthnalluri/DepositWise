@@ -331,7 +331,11 @@ def score_uploaded_batch(dataset_id: str, threshold: float | None = Query(defaul
         expected = artifact["features"]
         pipeline = artifact["pipeline"]
         target_candidates = [name for name in frame.columns if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"}]
-        features = frame.drop(columns=target_candidates + ["duration"], errors="ignore").reindex(columns=expected)
+        source_features = frame.drop(columns=target_candidates + ["duration"], errors="ignore")
+        missing_features = [name for name in expected if name not in source_features.columns]
+        if missing_features:
+            raise HTTPException(status_code=422, detail="Dataset is missing required production features: " + ", ".join(missing_features[:10]))
+        features = source_features.reindex(columns=expected)
         probabilities = pipeline.predict_proba(features)[:, 1]
         selected_threshold = float(threshold if threshold is not None else artifact.get("threshold", 0.5))
         output = frame.copy()
