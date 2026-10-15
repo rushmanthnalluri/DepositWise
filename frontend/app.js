@@ -84,6 +84,10 @@ function renderReport(data){
  const candidates=data.validation_model_comparison||[];
  $("#model-count").textContent=`${candidates.length} candidate models`;
  $("#model-table").innerHTML=candidates.map(x=>{const name=x.model??x.name??x.model_name??"Candidate";const ap=x.average_precision??x.ap??x.validation_average_precision;const auc=x.roc_auc??x.roc_auc_score;const f1=x.f1??x.validation_f1;const selected=String(name)===String(data.selected_model);return `<tr><td>${esc(name)}</td><td>${fmt(ap,3)}</td><td>${fmt(auc,3)}</td><td>${fmt(f1,3)}</td><td class="table-status">${selected?"CHAMPION":"CANDIDATE"}</td></tr>`;}).join("")||'<tr><td colspan="5">Candidate metrics are not included in the current report.</td></tr>';
+ const subgroup=data.subgroup_evaluation||{};
+ const subgroupRows=subgroup.metrics||[];
+ $("#subgroup-evaluation-table").innerHTML=subgroupRows.map(item=>'<tr><td>'+esc(item.feature)+'</td><td>'+esc(item.group)+'</td><td>'+Number(item.count).toLocaleString()+'</td><td>'+pct(item.observed_subscription_rate,1)+'</td><td>'+pct(item.predicted_positive_rate,1)+'</td><td>'+fmt(item.precision,3)+'</td><td>'+fmt(item.recall,3)+'</td><td>'+pct(item.false_positive_rate,1)+'</td></tr>').join("")||'<tr><td colspan="8">No groups met the minimum sample size.</td></tr>';
+ $("#subgroup-evaluation-note").textContent=subgroup.caveat||"Subgroup metrics are descriptive diagnostics, not a legal fairness certification.";
 }
 async function loadHealth(){
  try{
