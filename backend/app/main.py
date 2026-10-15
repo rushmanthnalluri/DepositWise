@@ -332,6 +332,7 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
     target_candidates = [name for name in frame.columns if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"}]
     target = None
     categorical_target_rates = []
+    campaign_trends = []
     if target_candidates:
         column = target_candidates[0]
         counts = frame[column].fillna("<missing>").astype(str).value_counts(dropna=False)
@@ -355,6 +356,16 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
                         "positive_rate": float(valid.mean()),
                     })
         categorical_target_rates.sort(key=lambda item: (item["feature"], -item["positive_rate"]))
+        month_column = next((name for name in frame.columns if str(name).strip().lower() == "month"), None)
+        if month_column is not None:
+            trend_frame = pd.DataFrame({"month": frame[month_column].fillna("<missing>").astype(str).str.lower(), "positive": positive})
+            grouped_month = trend_frame.groupby("month", dropna=False)["positive"].agg(["count", "mean"])
+            month_order = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+            campaign_trends = [
+                {"month": str(month), "contacts": int(row["count"]), "subscription_rate": float(row["mean"])}
+                for month, row in grouped_month.iterrows()
+            ]
+            campaign_trends.sort(key=lambda item: month_order.index(item["month"]) if item["month"] in month_order else len(month_order))
     numeric = frame.select_dtypes(include="number")
     correlations = []
     numeric_distributions = []
@@ -409,6 +420,7 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
         "dataset_id": dataset_id,
         "target_distribution": target,
         "categorical_target_rates": categorical_target_rates[:200],
+        "campaign_trends": campaign_trends,
         "numeric_distributions": numeric_distributions,
         "categorical_distributions": categorical_distributions,
         "numeric_target_summary": numeric_target_summary[:100],
