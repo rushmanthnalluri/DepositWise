@@ -143,6 +143,30 @@ def top_encoded_feature_importance(pipeline: Pipeline, limit: int = 15) -> list[
     return [{"feature": str(names[index]), "importance": float(values[index]), "method": method} for index in order]
 
 
+
+def build_numeric_feature_reference(frame: pd.DataFrame) -> dict[str, dict[str, list[float]]]:
+    """Create numeric reference histograms from training+validation features only."""
+    reference = {}
+    for column in frame.select_dtypes(include="number").columns:
+        values = frame[column].dropna().to_numpy(dtype=float)
+        if values.size < 2:
+            continue
+        low, high = float(values.min()), float(values.max())
+        epsilon = max(abs(low), abs(high), 1.0) * 1e-9
+        quantiles = [float(value) for value in np.quantile(values, [0.2, 0.4, 0.6, 0.8])]
+        edges = sorted(set([low - epsilon, *quantiles, high + epsilon]))
+        if len(edges) < 2:
+            edges = [low - 0.5, high + 0.5]
+        counts = np.histogram(values, bins=edges)[0]
+        proportions = np.maximum(counts.astype(float) / float(values.size), 1e-6)
+        proportions = proportions / proportions.sum()
+        reference[str(column)] = {
+            "edges": [float(edge) for edge in edges],
+            "proportions": [float(value) for value in proportions],
+        }
+    return reference
+
+
 def main() -> None:
     frame = read_dataset(DATA_PATH)
     y = frame.pop("y").map({"no": 0, "yes": 1}).astype(int)
@@ -214,12 +238,14 @@ def main() -> None:
         else:
             modes = X_train_val[column].dropna().mode()
             baseline_customer[column] = modes.iloc[0] if not modes.empty else "unknown"
+    feature_reference = build_numeric_feature_reference(X_train_val)
     joblib.dump({
         "pipeline": final_pipeline,
         "features": list(X.columns),
         "selected_model": best["model"],
         "threshold": validation_threshold,
         "baseline_customer": baseline_customer,
+        "feature_reference": feature_reference,
     }, MODEL_PATH)
     REPORT_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
