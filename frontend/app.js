@@ -53,6 +53,17 @@ function renderReport(data){
  $("#eval-precision").textContent=fmt(metrics.precision,3);
  $("#eval-recall").textContent=fmt(metrics.recall,3);
  $("#eval-brier").textContent=fmt(metrics.brier_score,3);
+ const curve=data.test_calibration_curve||[];
+ const plotW=320,plotH=170,left=45,top=15,bottom=top+plotH,right=left+plotW;
+ const points=curve.map(p=>({x:Number(p.mean_predicted_probability),y:Number(p.observed_positive_fraction)})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));
+ const coords=points.map(p=>`${left+Math.max(0,Math.min(1,p.x))*plotW},${bottom-Math.max(0,Math.min(1,p.y))*plotH}`).join(" ");
+ const circles=points.map(p=>`<circle cx="${left+Math.max(0,Math.min(1,p.x))*plotW}" cy="${bottom-Math.max(0,Math.min(1,p.y))*plotH}" r="4" fill="#d9a63f" stroke="#171a16" stroke-width="1.5"><title>Predicted ${fmt(p.x,2)}, observed ${fmt(p.y,2)}</title></circle>`).join("");
+ const grid=[0,0.25,0.5,0.75,1].map(v=>`<g><line x1="${left}" y1="${bottom-v*plotH}" x2="${right}" y2="${bottom-v*plotH}" stroke="#303630" stroke-dasharray="3 4"/><line x1="${left+v*plotW}" y1="${top}" x2="${left+v*plotW}" y2="${bottom}" stroke="#303630" stroke-dasharray="3 4"/><text x="${left-9}" y="${bottom-v*plotH+3}" fill="#8d978b" text-anchor="end" font-size="9">${v.toFixed(2)}</text><text x="${left+v*plotW}" y="${bottom+15}" fill="#8d978b" text-anchor="middle" font-size="9">${v.toFixed(2)}</text></g>`).join("");
+ $("#calibration-chart").innerHTML=points.length?`<svg viewBox="0 0 410 235" role="img" aria-label="Calibration curve comparing predicted probabilities with observed positive fractions" style="width:100%;height:auto"><rect x="0" y="0" width="410" height="235" fill="none"/>${grid}<line x1="${left}" y1="${bottom}" x2="${right}" y2="${top}" stroke="#777f74" stroke-width="1.5" stroke-dasharray="5 4"/><polyline points="${coords}" fill="none" stroke="#d9a63f" stroke-width="2"/>${circles}<text x="${left+plotW/2}" y="226" fill="#aab3a7" text-anchor="middle" font-size="10">Mean predicted probability</text><text x="12" y="${top+plotH/2}" fill="#aab3a7" text-anchor="middle" font-size="10" transform="rotate(-90 12 ${top+plotH/2})">Observed positive fraction</text></svg>`:'<div class="empty-state">Calibration curve is not present in the current report.</div>';
+ const cm=metrics.confusion_matrix||{};
+ const matrixRows=[["True negative","true_negative"],["False positive","false_positive"],["False negative","false_negative"],["True positive","true_positive"]];
+ $("#confusion-matrix").innerHTML=matrixRows.map(([label,key])=>`<div class="detail-row"><span>${label}</span><strong>${Number.isFinite(Number(cm[key]))?Number(cm[key]).toLocaleString():"—"}</strong></div>`).join("");
+
  $("#threshold-display").textContent=Number.isFinite(threshold)?pct(threshold,0):"—";
  $("#threshold-copy").textContent=data.threshold_selection?.method||"Operating threshold chosen on validation data; test data is reserved for final reporting.";
  $("#baseline-f1").textContent=fmt(base.f1,3);
