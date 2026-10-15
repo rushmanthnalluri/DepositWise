@@ -24,7 +24,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from ml.train import choose_f1_threshold, evaluate
+from ml.train import DATA_PATH, choose_f1_threshold, evaluate, read_dataset
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT / "frontend"
@@ -42,6 +42,7 @@ LIVE_CATEGORICAL_COUNTS: dict[str, dict[str, int]] = {}
 PREDICTION_LATENCIES = deque(maxlen=500)
 LAST_PREDICTION_AT: str | None = None
 DATASET_CACHE: dict[str, pd.DataFrame] = {}
+BUNDLED_FRAME: pd.DataFrame | None = None
 SANDBOX_MODELS: dict[str, dict[str, Any]] = {}
 SANDBOX_RUN_HISTORY = deque(maxlen=25)
 app = FastAPI(title="DepositWise API", description="Term-deposit subscription propensity prediction for educational use.", version="0.3.0")
@@ -179,6 +180,25 @@ def model_info() -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="Evaluation report could not be read.") from exc
 
 
+@app.get("/dataset/overview")
+def bundled_dataset_overview() -> dict[str, Any]:
+    """Profile the bundled Bank Marketing dataset using the same EDA used for uploads."""
+    frame = _get_uploaded_dataset("__bundled__")
+    target_counts = frame["y"].astype(str).value_counts(dropna=False)
+    return {
+        "dataset_id": "__bundled__",
+        "filename": DATA_PATH.name,
+        "rows": int(len(frame)),
+        "column_count": int(len(frame.columns)),
+        "numeric_columns": int(len(frame.select_dtypes(include="number").columns)),
+        "categorical_columns": int(len(frame.select_dtypes(exclude="number").columns)),
+        "missing_cells": int(frame.isna().sum().sum()),
+        "duplicate_rows": int(frame.duplicated().sum()),
+        "target_summary": {"column": "y", "counts": {str(key): int(value) for key, value in target_counts.items()}},
+        "visualization": uploaded_visualization_summary("__bundled__"),
+    }
+
+
 @app.post("/dataset/profile")
 async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
     """Profile an uploaded CSV/XLSX in memory; never saves or trains on the upload."""
@@ -255,6 +275,14 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 def _get_uploaded_dataset(dataset_id: str) -> pd.DataFrame:
+    global BUNDLED_FRAME
+    if dataset_id == "__bundled__":
+        if BUNDLED_FRAME is None:
+            try:
+                BUNDLED_FRAME = read_dataset(DATA_PATH)
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail="Bundled Bank Marketing dataset is unavailable.") from exc
+        return BUNDLED_FRAME
     frame = DATASET_CACHE.get(dataset_id)
     if frame is None:
         raise HTTPException(status_code=404, detail="This temporary dataset profile has expired or was evicted. Upload the file again.")
