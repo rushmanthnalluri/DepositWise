@@ -239,4 +239,5 @@ async function loadProfileInsight(action){
   output.innerHTML='<div class="panel" style="margin-top:16px"><div class="panel-header"><div><div class="eyebrow">DATASET ANALYSIS</div><h2>'+title+'</h2></div><span class="pill pill-green">Computed live</span></div>'+body+'</div>';
  }catch(error){output.innerHTML='<div class="error-message">'+esc(error.message)+'</div>';}
 }
+$("#bundled-eda-button").addEventListener("click",()=>{activeDatasetId="__bundled__";$("#profile-output").hidden=false;$("#profile-output").innerHTML='<div id="profile-insights"></div>';loadProfileInsight("visualization");});
 renderStage();loadHealth();loadReport();loadExperiments();
