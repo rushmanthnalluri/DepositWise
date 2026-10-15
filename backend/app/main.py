@@ -41,6 +41,7 @@ app = FastAPI(title="DepositWise API", description="Term-deposit subscription pr
 
 class PredictionRequest(BaseModel):
     customer: dict[str, Any] = Field(..., description="Dataset feature names and values, excluding target y and post-call duration.")
+    threshold: float | None = Field(default=None, ge=0.0, le=1.0, description="Optional decision threshold override for what-if analysis.")
 
 
 class SandboxTrainingRequest(BaseModel):
@@ -406,7 +407,7 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
                 explanations = explanations[:5]
             except Exception:
                 explanations = []
-        threshold = float(artifact.get("threshold", 0.5))
+        threshold = float(request.threshold if request.threshold is not None else artifact.get("threshold", 0.5))
         PREDICTION_COUNT += 1
         LAST_PREDICTION_AT = datetime.now(timezone.utc).isoformat()
         PREDICTION_LATENCIES.append((time.perf_counter() - started) * 1000)
