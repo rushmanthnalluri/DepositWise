@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import LogisticRegression
 
-from ml.train import build_pipeline, read_dataset
+from ml.train import build_numeric_feature_reference, build_pipeline, read_dataset
 
 
 def test_read_dataset_accepts_semicolon_delimited_csv(tmp_path):
@@ -54,3 +54,13 @@ def test_threshold_selection_uses_validation_probabilities():
     assert "brier_score" in metrics
     assert "balanced_accuracy" in metrics
     assert metrics["confusion_matrix"]["true_positive"] >= 1
+
+
+def test_numeric_feature_reference_uses_valid_histogram_proportions():
+    frame = pd.DataFrame({"age": list(range(1, 11)), "constant": [5] * 10, "job": ["admin"] * 10})
+    reference = build_numeric_feature_reference(frame)
+    assert set(reference) == {"age", "constant"}
+    for item in reference.values():
+        assert len(item["edges"]) == len(item["proportions"]) + 1
+        assert sum(item["proportions"]) == pytest.approx(1.0)
+        assert all(value > 0 for value in item["proportions"])
