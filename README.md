@@ -168,17 +168,38 @@ tests/             API and ML tests
 .github/workflows/ GitHub Actions CI
 ```
 
+## Current workbench capabilities
+
+- Dark, responsive campaign-intelligence shell with navigation for Overview, Customer Scoring, Data Explorer, Model Lab, Evaluation, and Model Health.
+- Nine-stage guided ML workbench navigation, linked to the relevant workspace views.
+- Live dashboard metrics and feature importance are loaded from the generated model report rather than hardcoded in the interface.
+- CSV/XLSX upload profiling runs in memory and reports dimensions, column types, missing cells, duplicate rows, unique counts, and a sample preview.
+- Uploaded files are not persisted, do not replace the bundled dataset, and do not trigger model retraining.
+- Customer scoring calls the deployed model API and displays the estimated probability, selected threshold, and classification.
+- Model evaluation shows held-out metrics, validation-threshold context, candidate comparison where present, and top encoded feature importance.
+- Model-health page distinguishes actual API/model availability from monitoring capabilities that are not yet wired up.
+- Keyboard focus states, responsive layouts, reduced-motion support, upload-size/type checks, and API error states are included.
+
+## Feature parity status
+
+The interface and core interaction patterns are being adapted from [PropPulse](https://github.com/rushmanthnalluri/prop-pulse) and [PlacementPredict](https://github.com/rushmanthnalluri/placement-predict), with banking-specific equivalents instead of property valuation or student salary functionality.
+
+**Not yet implemented:** isolated sandbox model training, configurable preprocessing policies, persistent experiment tracking/model registry, per-customer SHAP explanations, campaign lift and cost optimization, prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The guided stages currently provide navigation and guidance; they are not all full training workflows yet.
+
 ## Roadmap
 
-- Tune the threshold against a documented campaign cost/benefit objective and evaluate business lift.
-- Add subgroup/fairness checks, feature-drift monitoring, and temporal validation for future campaigns.
+1. Complete the upload-to-evaluation sandbox pipeline with schema validation, configurable preprocessing, training jobs, and comparison reports.
+2. Add per-prediction explanations and campaign lift/cost scenarios.
+3. Implement privacy-aware prediction logging, feature-drift monitoring, and human-approved retraining recommendations.
+4. Add subgroup/fairness evaluation and temporal validation for future campaigns.
 
 ## References
 
 - [Kaggle Banking Dataset — Marketing Targets](https://www.kaggle.com/datasets/prakharrathi25/banking-dataset-marketing-targets)
+- [UCI Bank Marketing dataset](https://archive.ics.uci.edu/dataset/222/bank+marketing)
 - [PropPulse](https://github.com/rushmanthnalluri/prop-pulse)
-- [PlacementPredict](https://github.com/rushmanthnalluri/PlacementPredict) (repository access was not verified in this session)
+- [PlacementPredict](https://github.com/rushmanthnalluri/placement-predict)
 
 ## Status
 
-The API, browser workbench, auto-downloadable dataset pipeline, EDA script, three-model comparison, held-out test evaluation, Docker build-time training, and CI are committed. No CSV or model artifact is stored in Git. CI results and the latest Render deploy should be checked before claiming the current deployment is healthy; model metrics should be read from the generated evaluation report rather than assumed.
+The current branch contains the dashboard redesign, connected report-backed overview/evaluation views, customer scoring UI, and an in-memory CSV/XLSX data profiler with tests. This does **not** mean full feature parity is complete. No uploaded dataset is persisted or used to retrain the deployed model. Verify the latest CI run and Render deployment before claiming the new revision is live.
