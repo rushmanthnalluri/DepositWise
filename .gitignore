@@ -16,6 +16,8 @@ models/*
 !models/.gitkeep
 reports/generated/*
 !reports/generated/.gitkeep
+reports/figures/*
+!reports/figures/.gitkeep
 mlruns/
 .DS_Store
 node_modules/
