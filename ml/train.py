@@ -263,6 +263,7 @@ def main() -> None:
             baseline_customer[column] = modes.iloc[0] if not modes.empty else "unknown"
     feature_reference = build_numeric_feature_reference(X_train_val)
     categorical_reference = build_categorical_feature_reference(X_train_val)
+    explanation_background = X_train_val.sample(n=min(100, len(X_train_val)), random_state=RANDOM_STATE).copy()
     candidate_pipelines = {}
     for candidate_name, candidate_classifier in candidates.items():
         candidate_pipeline = build_pipeline(X_train_val, candidate_classifier)
@@ -278,6 +279,7 @@ def main() -> None:
         "baseline_customer": baseline_customer,
         "feature_reference": feature_reference,
         "categorical_reference": categorical_reference,
+        "explanation_background": explanation_background,
     }, MODEL_PATH)
     REPORT_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
