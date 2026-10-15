@@ -167,6 +167,25 @@ def build_numeric_feature_reference(frame: pd.DataFrame) -> dict[str, dict[str, 
     return reference
 
 
+
+def build_categorical_feature_reference(frame: pd.DataFrame, max_categories: int = 20) -> dict[str, dict[str, object]]:
+    """Build bounded categorical-frequency references for privacy-safe drift checks."""
+    reference = {}
+    for column in frame.select_dtypes(exclude="number").columns:
+        values = frame[column].fillna("<missing>").astype(str)
+        top = values.value_counts().head(max_categories).index.tolist()
+        labels = [str(value) for value in top] + ["__OTHER__"]
+        mapped = values.where(values.isin(top), "__OTHER__")
+        counts = mapped.value_counts().reindex(labels, fill_value=0).to_numpy(dtype=float)
+        proportions = np.maximum(counts / max(float(counts.sum()), 1.0), 1e-6)
+        proportions = proportions / proportions.sum()
+        reference[str(column)] = {
+            "labels": labels,
+            "proportions": [float(value) for value in proportions],
+        }
+    return reference
+
+
 def main() -> None:
     frame = read_dataset(DATA_PATH)
     y = frame.pop("y").map({"no": 0, "yes": 1}).astype(int)
@@ -243,6 +262,7 @@ def main() -> None:
             modes = X_train_val[column].dropna().mode()
             baseline_customer[column] = modes.iloc[0] if not modes.empty else "unknown"
     feature_reference = build_numeric_feature_reference(X_train_val)
+    categorical_reference = build_categorical_feature_reference(X_train_val)
     candidate_pipelines = {}
     for candidate_name, candidate_classifier in candidates.items():
         candidate_pipeline = build_pipeline(X_train_val, candidate_classifier)
@@ -257,6 +277,7 @@ def main() -> None:
         "threshold": validation_threshold,
         "baseline_customer": baseline_customer,
         "feature_reference": feature_reference,
+        "categorical_reference": categorical_reference,
     }, MODEL_PATH)
     REPORT_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
