@@ -138,3 +138,11 @@ def test_metrics_endpoint_reports_aggregate_data_without_customer_features():
     assert "mean_latency_ms" in metrics
     assert metrics["drift_monitoring"] == "not_configured"
     assert "raw customer features are not logged" in metrics["privacy_note"]
+
+
+def test_prediction_threshold_override_is_range_validated():
+    response = client.post(
+        "/predict",
+        json={"customer": {"age": 35}, "threshold": 1.5},
+    )
+    assert response.status_code == 422
