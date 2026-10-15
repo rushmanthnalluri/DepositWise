@@ -225,3 +225,15 @@ def test_batch_scoring_exports_probabilities_and_classifications(tmp_path, monke
     assert len(scored) == 20
     assert "depositwise_subscription_probability" in scored.columns
     assert "depositwise_predicted_subscription" in scored.columns
+
+
+def test_dataset_profile_detects_semicolon_delimited_bank_marketing_csv():
+    response = client.post(
+        "/dataset/profile",
+        files={"file": ("bank-full.csv", b"age;job;y\\n35;management;yes\\n42;technician;no\\n", "text/csv")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["column_count"] == 3
+    assert [column["name"] for column in data["columns"]] == ["age", "job", "y"]
+    assert data["target_summary"]["column"] == "y"
