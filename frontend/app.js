@@ -118,6 +118,8 @@ async function loadReport(){
 }
 $("#refresh-health").addEventListener("click",()=>{loadHealth();loadReport();});
 const form=$("#prediction-form");
+const modelPicker=form.querySelector('select[name="model"]');
+modelPicker.addEventListener("change",()=>{const thresholds=report?.candidate_thresholds||{};const selected=modelPicker.value;const threshold=selected?(thresholds[selected]??report?.threshold_selection?.threshold):report?.threshold_selection?.threshold;if(Number.isFinite(Number(threshold))){$("#threshold-control").value=String(Math.max(10,Math.min(90,Math.round(Number(threshold)*100))));$("#threshold-control-label").textContent=pct(Number($("#threshold-control").value)/100,0);}});
 form.addEventListener("submit",async event=>{
  event.preventDefault();const btn=$("#submit-button");const error=$("#result-error");error.hidden=true;btn.disabled=true;btn.innerHTML="Scoring customer…";
  const values=Object.fromEntries(new FormData(form).entries());const selectedModel=values.model||null;delete values.model;for(const k of ["age","balance","day","campaign","pdays","previous"])values[k]=Number(values[k]);
