@@ -17,6 +17,7 @@ let activeDatasetId = null;
 let activeSandboxRunId = null;
 let activeSampleRow = null;
 let activeTargetColumn = null;
+let lastProbability = null;
 let currentStage = 0;
 
 function showView(name, label) {
@@ -48,7 +49,8 @@ function renderReport(data){
  $("#champion-name").textContent=data.selected_model||"Not available";
  $("#selection-metric").textContent=data.selection_metric||"Average precision";
  const threshold=Number(data.threshold_selection?.threshold??data.threshold_selection?.selected_threshold);
- $("#decision-threshold").textContent=Number.isFinite(threshold)?pct(threshold,0):"—";
+  $("#decision-threshold").textContent=Number.isFinite(threshold)?pct(threshold,0):"—";
+ if(Number.isFinite(threshold)){ $("#threshold-control").value=String(Math.max(10,Math.min(90,Math.round(threshold*100)))); $("#threshold-control-label").textContent=pct(Number($("#threshold-control").value)/100,0); }
  $("#overview-metrics").innerHTML=metricBars([["Average precision",metrics.average_precision],["ROC-AUC",metrics.roc_auc],["Precision",metrics.precision],["Recall",metrics.recall],["F1 score",metrics.f1]]);
  const features=data.top_encoded_feature_importance||[];
  $("#feature-list").innerHTML=featureMarkup(features);
@@ -107,15 +109,26 @@ const form=$("#prediction-form");
 form.addEventListener("submit",async event=>{
  event.preventDefault();const btn=$("#submit-button");const error=$("#result-error");error.hidden=true;btn.disabled=true;btn.innerHTML="Scoring customer…";
  const values=Object.fromEntries(new FormData(form).entries());for(const k of ["age","balance","day","campaign","pdays","previous"])values[k]=Number(values[k]);
- try{const res=await fetch("/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({customer:values})});const data=await res.json();if(!res.ok)throw new Error(data.detail||"Prediction failed");
- const probability=Math.max(0,Math.min(1,Number(data.subscription_probability)));const percentage=(probability*100).toFixed(1);$("#result-empty").hidden=true;$("#result-content").hidden=false;$("#probability-value").textContent=percentage;$("#meter-fill").style.width=percentage+"%";
+ try{const res=await fetch("/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({customer:values,threshold:Number($("#threshold-control").value)/100})});const data=await res.json();if(!res.ok)throw new Error(data.detail||"Prediction failed");
+ const probability=Math.max(0,Math.min(1,Number(data.subscription_probability)));const percentage=(probability*100).toFixed(1);lastProbability=probability;$("#result-empty").hidden=true;$("#result-content").hidden=false;$("#probability-value").textContent=percentage;$("#meter-fill").style.width=percentage+"%";
  $("#outcome").textContent=data.predicted_subscription?"Above selected threshold":"Below selected threshold";$("#outcome").classList.toggle("negative",!data.predicted_subscription);$("#threshold-value").textContent=pct(data.threshold,0);$("#prediction-model").textContent=data.selected_model||"Current champion";$("#result-note").textContent=data.note||"Estimate returned by the current model.";
  const impacts=data.top_feature_impacts||[];
  $("#prediction-explanations").innerHTML=impacts.length?'<div class="explanation-heading">Top feature signals <span>baseline sensitivity</span></div><div class="feature-list">'+impacts.map(item=>'<div class="explanation-row"><span class="feature-name">'+esc(item.feature)+'</span><span class="explanation-impact '+(Number(item.impact_probability)>=0?"positive":"negative")+'">'+(Number(item.impact_probability)>=0?"+":"")+fmt(Number(item.impact_probability)*100,2)+' pp</span></div>').join("")+'</div><p class="muted-copy">These single-feature changes compare this input with a typical training profile. They are not causal effects or SHAP values.</p>':'<p class="muted-copy">Per-prediction explanations are unavailable for this model artifact.</p>';
  $("#api-status").textContent="API and model ready";
  }catch(e){error.textContent=e.message;error.hidden=false;}finally{btn.disabled=false;btn.innerHTML="Estimate subscription likelihood <span>↗</span>";}
 });
-form.addEventListener("reset",()=>{setTimeout(()=>{$("#result-error").hidden=true;$("#result-content").hidden=true;$("#result-empty").hidden=false;},0);});
+
+$("#threshold-control").addEventListener("input",()=>{
+ const threshold=Number($("#threshold-control").value)/100;
+ $("#threshold-control-label").textContent=pct(threshold,0);
+ $("#threshold-value").textContent=pct(threshold,0);
+ if(lastProbability!==null){
+  const above=lastProbability>=threshold;
+  $("#outcome").textContent=above?"Above selected threshold":"Below selected threshold";
+  $("#outcome").classList.toggle("negative",!above);
+ }
+});
+form.addEventListener("reset",()=>{lastProbability=null;setTimeout(()=>{$("#result-error").hidden=true;$("#result-content").hidden=true;$("#result-empty").hidden=false;},0);});
 function renderStage(){
  const s=stages[currentStage];$("#workflow-title").textContent=s.title;$("#workflow-description").textContent=s.desc;$("#workflow-stage").textContent="STAGE "+String(currentStage+1).padStart(2,"0")+" / 09";$("#workflow-progress-fill").style.width=((currentStage+1)/9*100)+"%";
  $("#workflow-content").innerHTML=`<div class="eyebrow">STAGE ${String(currentStage+1).padStart(2,"0")}</div><h2>${esc(s.title)}</h2><p>${esc(s.desc)}</p><ul>${s.bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><button class="button button-secondary" id="stage-open-view">Open related workspace →</button>`;
