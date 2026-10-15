@@ -213,7 +213,7 @@ def test_batch_scoring_exports_probabilities_and_classifications(tmp_path, monke
         dataset_rows.append(f"{20 + i},{100 + i * 10},{'admin.' if i % 2 == 0 else 'technician'},{'yes' if i % 2 else 'no'}")
     upload = client.post(
         "/dataset/profile",
-        files={"file": ("batch.csv", ("\\n".join(dataset_rows) + "\\n").encode(), "text/csv")},
+        files={"file": ("batch.csv", ("\n".join(dataset_rows) + "\n").encode(), "text/csv")},
     )
     assert upload.status_code == 200
 
