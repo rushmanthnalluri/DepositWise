@@ -166,7 +166,7 @@ async function trainSandboxDataset(){
  if(!activeDatasetId||!activeTargetColumn)return;
  const output=$("#sandbox-training-output");const button=$("#sandbox-train-button");button.disabled=true;button.textContent="Training sandbox models…";output.innerHTML='<div class="empty-state">Training isolated candidate models. This can take a little while.</div>';
  try{
-  const res=await fetch("/workflow/"+encodeURIComponent(activeDatasetId)+"/train",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:activeTargetColumn,models:["logistic_regression","random_forest","extra_trees"],row_limit:20000,numeric_imputation:$("#sandbox-numeric-imputation").value,categorical_imputation:$("#sandbox-categorical-imputation").value,scale_numeric:$("#sandbox-scale-numeric").value==="true"})});
+  const res=await fetch("/workflow/"+encodeURIComponent(activeDatasetId)+"/train",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:activeTargetColumn,models:$("input[name=\\"sandbox-model\\"]:checked").map(input=>input.value),row_limit:20000,numeric_imputation:$("#sandbox-numeric-imputation").value,categorical_imputation:$("#sandbox-categorical-imputation").value,scale_numeric:$("#sandbox-scale-numeric").value==="true"})});
   const data=await res.json();if(!res.ok)throw new Error(data.detail||"Sandbox training failed.");
   activeSandboxRunId=data.run_id;
   const rows=(data.validation_model_comparison||[]).map(m=>"<tr><td>"+esc(m.model)+"</td><td>"+fmt(m.average_precision,3)+"</td><td>"+fmt(m.roc_auc,3)+"</td><td>"+fmt(m.f1,3)+"</td><td class=\"table-status\">"+(m.model===data.selected_model?"CHAMPION":"CANDIDATE")+"</td></tr>").join("");
