@@ -186,7 +186,7 @@ tests/             API and ML tests
 
 The interface and core interaction patterns are being adapted from [PropPulse](https://github.com/rushmanthnalluri/prop-pulse) and [PlacementPredict](https://github.com/rushmanthnalluri/placement-predict), with banking-specific equivalents instead of property valuation or student salary functionality.
 
-**Not yet implemented:** persistent experiment tracking/model registry, per-prediction SHAP explanations, campaign lift and cost optimization, prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The guided workbench now connects upload, profiling, EDA, sandbox training, evaluation, and sandbox scoring; preprocessing configuration and persistent run management remain future work.
+**Not yet implemented:** persistent experiment tracking/model registry, per-prediction SHAP explanations, campaign lift and cost optimization, feature-value prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The current metrics endpoint deliberately retains only aggregate counts and latency, not raw customer features. The guided workbench now connects upload, profiling, EDA, sandbox training, evaluation, and sandbox scoring; preprocessing configuration and persistent run management remain future work.
 
 ## Roadmap
 
