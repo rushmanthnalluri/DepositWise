@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 from sklearn.linear_model import LogisticRegression
 
-from ml.train import build_numeric_feature_reference, build_pipeline, read_dataset
+from ml.train import build_categorical_feature_reference, build_numeric_feature_reference, build_pipeline, read_dataset
 
 
 def test_read_dataset_accepts_semicolon_delimited_csv(tmp_path):
@@ -64,3 +64,12 @@ def test_numeric_feature_reference_uses_valid_histogram_proportions():
         assert len(item["edges"]) == len(item["proportions"]) + 1
         assert sum(item["proportions"]) == pytest.approx(1.0)
         assert all(value > 0 for value in item["proportions"])
+
+
+def test_categorical_feature_reference_is_bounded_and_normalized():
+    frame = pd.DataFrame({"job": ["admin.", "technician", "admin.", "retired", None]})
+    reference = build_categorical_feature_reference(frame)
+    item = reference["job"]
+    assert "__OTHER__" in item["labels"]
+    assert len(item["labels"]) == len(item["proportions"])
+    assert sum(item["proportions"]) == pytest.approx(1.0)
