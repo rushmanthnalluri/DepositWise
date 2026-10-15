@@ -105,7 +105,7 @@ def metrics() -> dict[str, Any]:
             FEATURE_REFERENCE = joblib.load(MODEL_PATH).get("feature_reference", {})
         except Exception:
             FEATURE_REFERENCE = {}
-    latencies = list(PREDICTION_LATENCIES
+    latencies = list(PREDICTION_LATENCIES)
     drift_features = []
     for feature, reference in FEATURE_REFERENCE.items():
         counts = LIVE_FEATURE_COUNTS.get(feature, [])
