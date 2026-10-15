@@ -126,6 +126,10 @@ def test_sandbox_training_and_prediction_do_not_touch_production_model():
     assert result["preprocessing_config"]["categorical_imputation"] == "constant"
     assert result["preprocessing_config"]["scale_numeric"] is False
     assert "final_test_metrics" in result
+    history = client.get("/experiments")
+    assert history.status_code == 200
+    assert history.json()["persistent"] is False
+    assert any(run["run_id"] == result["run_id"] for run in history.json()["runs"])
 
     prediction = client.post(
         f"/workflow/{dataset_id}/predict",
