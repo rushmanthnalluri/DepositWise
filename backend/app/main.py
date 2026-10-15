@@ -95,6 +95,8 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
             frame = pd.read_excel(io.BytesIO(raw), engine="openpyxl")
         else:
             frame = pd.read_csv(io.BytesIO(raw), low_memory=False)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=422, detail="Could not parse this file. Check that it is a valid CSV or XLSX.") from exc
     if frame.empty or len(frame.columns) == 0:
