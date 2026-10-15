@@ -1,3 +1,4 @@
+import json
 import io
 import joblib
 import pandas as pd
@@ -180,6 +181,8 @@ def test_predict_returns_baseline_sensitivity_and_honors_threshold(tmp_path, mon
         "baseline_customer": {"age": 29.5, "balance": 195.0, "job": "admin."},
     }, model_path)
     monkeypatch.setattr(main, "MODEL_PATH", model_path)
+    prediction_log = tmp_path / "predictions.jsonl"
+    monkeypatch.setattr(main, "PREDICTION_LOG_PATH", prediction_log)
 
     response = client.post(
         "/predict",
@@ -189,6 +192,10 @@ def test_predict_returns_baseline_sensitivity_and_honors_threshold(tmp_path, mon
     result = response.json()
     assert result["threshold"] == 0.9
     assert result["selected_model"] == "logistic_regression"
+    assert prediction_log.exists()
+    event = json.loads(prediction_log.read_text(encoding="utf-8").splitlines()[-1])
+    assert "customer" not in event and "customer_features" not in event
+    assert event["selected_model"] == "logistic_regression"
     assert result["explanation_method"].startswith("single-feature baseline sensitivity")
     assert len(result["top_feature_impacts"]) <= 5
     assert all("impact_probability" in item for item in result["top_feature_impacts"])
