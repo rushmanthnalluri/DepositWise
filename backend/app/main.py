@@ -166,7 +166,7 @@ def metrics() -> dict[str, Any]:
         "drift_features": drift_features[:10],
         "psi_thresholds": {"warning": 0.1, "drift": 0.2, "minimum_feature_samples": 50},
         "prediction_log_available": PREDICTION_LOG_PATH.exists(),
-        "privacy_note": "Prediction events log timestamp, model, probability, threshold, outcome, and latency only; raw customer feature values are not logged. The deployment filesystem may be ephemeral.",
+        "privacy_note": "Prediction events log timestamp, model, probability, threshold, outcome, and latency only; raw customer features are not logged; the deployment filesystem may be ephemeral. The deployment filesystem may be ephemeral.",
     }
 
 
