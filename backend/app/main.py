@@ -625,5 +625,7 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
             "explanation_method": "single-feature baseline sensitivity; not causal and not SHAP",
             "note": "Educational estimate, not a guarantee. Validate model quality and tune the decision threshold before operational use.",
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Could not process supplied features: {exc}") from exc
