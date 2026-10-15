@@ -86,7 +86,7 @@ form.addEventListener("submit",async event=>{
  try{const res=await fetch("/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({customer:values})});const data=await res.json();if(!res.ok)throw new Error(data.detail||"Prediction failed");
  const probability=Math.max(0,Math.min(1,Number(data.subscription_probability)));const percentage=(probability*100).toFixed(1);$("#result-empty").hidden=true;$("#result-content").hidden=false;$("#probability-value").textContent=percentage;$("#meter-fill").style.width=percentage+"%";
  $("#outcome").textContent=data.predicted_subscription?"Above selected threshold":"Below selected threshold";$("#outcome").classList.toggle("negative",!data.predicted_subscription);$("#threshold-value").textContent=pct(data.threshold,0);$("#prediction-model").textContent=data.selected_model||"Current champion";$("#result-note").textContent=data.note||"Estimate returned by the current model.";$("#api-status").textContent="API and model ready";
- }catch(e){error.textContent=e.message;error.hidden=false;}finally{btn.disabled=false;btn.innerHTML="Estimate likelihood <span>↗</span>";}
+ }catch(e){error.textContent=e.message;error.hidden=false;}finally{btn.disabled=false;btn.innerHTML="Estimate subscription likelihood <span>↗</span>";}
 });
 form.addEventListener("reset",()=>{setTimeout(()=>{$("#result-error").hidden=true;$("#result-content").hidden=true;$("#result-empty").hidden=false;},0);});
 function renderStage(){
