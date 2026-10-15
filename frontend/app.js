@@ -10,7 +10,10 @@ const stages = [
   {title:"Preprocess safely",desc:"Prepare features without leaking information from held-out data.",bullets:["Choose numeric mean or median imputation","Choose categorical most-frequent or constant imputation","Optionally scale numeric features inside the training pipeline"],view:"dataset"},
   {title:"Train and compare models",desc:"Train temporary candidates on an uploaded binary-classification dataset and compare them safely.",bullets:["Compare Logistic Regression, Random Forest, and Extra Trees","Select the champion using validation average precision","Keep sandbox artifacts separate from the production model"],view:"dataset"},
   {title:"Evaluate models",desc:"Read held-out metrics and probability-quality diagnostics.",bullets:["Review precision, recall, F1, ROC-AUC and average precision","Compare the tuned threshold with 0.5","Inspect calibration and feature importance"],view:"evaluation"},
-  {title:"Score a customer",desc:"Submit a profile to the deployed inference API.",bullets:["Enter pre-call customer and campaign attributes","Get probability and threshold-based classification","Treat the output as decision support, not a guarantee"],view:"prediction"}
+  {title:"Score a customer",desc:"Submit a profile to the deployed inference API.",bullets:["Enter pre-call customer and campaign attributes","Get probability and threshold-based classification","Treat the output as decision support, not a guarantee"],view:"prediction"},
+  {title:"Feature importance and local sensitivity",desc:"Understand broad model signals and how a score changes when one feature is varied from a reference profile.",bullets:["Review encoded-feature importance from the selected model","Inspect baseline-sensitivity changes for individual predictions","These signals are not SHAP explanations or causal effects"],view:"evaluation"},
+  {title:"Model health and drift",desc:"Inspect API readiness, prediction volume, latency, and numeric feature drift indicators.",bullets:["Review service and model availability","Inspect PSI warnings when enough scored samples accumulate","Monitoring is in-memory on the current deployment and resets on restart"],view:"monitoring"},
+  {title:"Campaign planning and segments",desc:"Explore subscription rates across customer groups and estimate simple campaign economics with explicit assumptions.",bullets:["Compare target rates by categorical segment in uploaded data","Use the expected-net calculator for illustrative assumptions","Validate contact costs, value, capacity, and fairness before operational use"],view:"dataset"}
 ];
 let report = null;
 let activeDatasetId = null;
@@ -151,12 +154,12 @@ $("#subscription-value").addEventListener("input",updateEconomics);
 $("#contact-cost").addEventListener("input",updateEconomics);
 
 function renderStage(){
- const s=stages[currentStage];$("#workflow-title").textContent=s.title;$("#workflow-description").textContent=s.desc;$("#workflow-stage").textContent="STAGE "+String(currentStage+1).padStart(2,"0")+" / 09";$("#workflow-progress-fill").style.width=((currentStage+1)/9*100)+"%";
+ const s=stages[currentStage];$("#workflow-title").textContent=s.title;$("#workflow-description").textContent=s.desc;$("#workflow-stage").textContent="STAGE "+String(currentStage+1).padStart(2,"0")+" / 12";$("#workflow-progress-fill").style.width=((currentStage+1)/12*100)+"%";
  $("#workflow-content").innerHTML=`<div class="eyebrow">STAGE ${String(currentStage+1).padStart(2,"0")}</div><h2>${esc(s.title)}</h2><p>${esc(s.desc)}</p><ul>${s.bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><button class="button button-secondary" id="stage-open-view">Open related workspace →</button>`;
- $("#stage-open-view").addEventListener("click",()=>showView(s.view,s.title));$("#workflow-prev").disabled=currentStage===0;$("#workflow-next").textContent=currentStage===8?"Back to overview →":"Next stage →";
+ $("#stage-open-view").addEventListener("click",()=>showView(s.view,s.title));$("#workflow-prev").disabled=currentStage===0;$("#workflow-next").textContent=currentStage===11?"Back to overview →":"Next stage →";
 }
 $("#workflow-prev").addEventListener("click",()=>{if(currentStage>0){currentStage--;renderStage();}});
-$("#workflow-next").addEventListener("click",()=>{if(currentStage<8){currentStage++;renderStage();}else showView("overview");});
+$("#workflow-next").addEventListener("click",()=>{if(currentStage<11){currentStage++;renderStage();}else showView("overview");});
 const fileInput=$("#dataset-file");
 fileInput.addEventListener("change",()=>{if(fileInput.files[0])uploadDataset(fileInput.files[0]);});
 const drop=$("#upload-drop");
