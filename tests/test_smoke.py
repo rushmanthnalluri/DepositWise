@@ -174,6 +174,8 @@ def test_predict_returns_baseline_sensitivity_and_honors_threshold(tmp_path, mon
         "pipeline": pipeline,
         "features": list(X.columns),
         "selected_model": "logistic_regression",
+        "candidate_pipelines": {"logistic_regression": pipeline},
+        "candidate_thresholds": {"logistic_regression": 0.4},
         "threshold": 0.5,
         "baseline_customer": {"age": 29.5, "balance": 195.0, "job": "admin."},
     }, model_path)
@@ -181,11 +183,12 @@ def test_predict_returns_baseline_sensitivity_and_honors_threshold(tmp_path, mon
 
     response = client.post(
         "/predict",
-        json={"customer": {"age": 35, "balance": 300, "job": "technician"}, "threshold": 0.9},
+        json={"customer": {"age": 35, "balance": 300, "job": "technician"}, "model": "logistic_regression", "threshold": 0.9},
     )
     assert response.status_code == 200
     result = response.json()
     assert result["threshold"] == 0.9
+    assert result["selected_model"] == "logistic_regression"
     assert result["explanation_method"].startswith("single-feature baseline sensitivity")
     assert len(result["top_feature_impacts"]) <= 5
     assert all("impact_probability" in item for item in result["top_feature_impacts"])
