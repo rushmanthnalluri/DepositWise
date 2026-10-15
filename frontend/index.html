@@ -1,71 +1,70 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f0e7">
-  <title>DepositWise — Campaign Workbench</title>
-  <link rel="stylesheet" href="/static/styles.css">
-  <script src="/static/app.js" defer></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f1110"><title>DepositWise — Campaign Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css"><script src="/static/app.js" defer></script>
 </head>
 <body>
-  <div class="shell">
-    <header class="topbar">
-      <a class="brand" href="/dashboard" aria-label="DepositWise home"><span class="brand-mark">D</span><span>DepositWise</span></a>
-      <div class="topbar-right"><span class="status-dot"></span><span id="api-status">Checking API</span><a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API docs ↗</a></div>
-    </header>
-    <main>
-      <section class="hero">
-        <div class="eyebrow">BANK CAMPAIGN INTELLIGENCE</div>
-        <h1>Better conversations<br><em>start with better signals.</em></h1>
-        <p>Explore the estimated likelihood of a term-deposit subscription using customer and campaign attributes.</p>
-        <div class="hero-note"><span class="note-icon">i</span><span>Decision support for learning and analysis — not a guarantee of customer behavior.</span></div>
-      </section>
-      <section class="workspace">
-        <div class="form-panel">
-          <div class="panel-heading"><div><div class="eyebrow">CUSTOMER PROFILE</div><h2>Campaign inputs</h2></div><span class="step-label">01 / 02</span></div>
-          <form id="prediction-form">
-            <div class="form-grid">
-              <label>Age <input name="age" type="number" min="18" max="110" value="35" required></label>
-              <label>Account balance <input name="balance" type="number" value="1200" required></label>
-              <label>Job <select name="job"><option>management</option><option>admin.</option><option>technician</option><option>blue-collar</option><option>services</option><option>retired</option><option>student</option><option>unemployed</option><option>entrepreneur</option><option>housemaid</option><option>self-employed</option><option>unknown</option></select></label>
-              <label>Marital status <select name="marital"><option>married</option><option>single</option><option>divorced</option></select></label>
-              <label>Education <select name="education"><option>tertiary</option><option>secondary</option><option>primary</option><option>unknown</option></select></label>
-              <label>Credit default <select name="default"><option>no</option><option>yes</option></select></label>
-              <label>Housing loan <select name="housing"><option>yes</option><option>no</option></select></label>
-              <label>Personal loan <select name="loan"><option>no</option><option>yes</option></select></label>
-              <label>Contact method <select name="contact"><option>cellular</option><option>telephone</option><option>unknown</option></select></label>
-              <label>Last contact day <input name="day" type="number" min="1" max="31" value="15" required></label>
-              <label>Last contact month <select name="month"><option>may</option><option>jan</option><option>feb</option><option>mar</option><option>apr</option><option>jun</option><option>jul</option><option>aug</option><option>sep</option><option>oct</option><option>nov</option><option>dec</option></select></label>
-              <label>Contacts in this campaign <input name="campaign" type="number" min="1" value="1" required></label>
-              <label>Days since previous contact <input name="pdays" type="number" value="-1" required><small>-1 means no previous contact recorded</small></label>
-              <label>Previous contacts <input name="previous" type="number" min="0" value="0" required></label>
-              <label>Previous campaign outcome <select name="poutcome"><option>unknown</option><option>success</option><option>failure</option><option>other</option></select></label>
-            </div>
-            <div class="form-actions"><button id="submit-button" type="submit"><span>Estimate subscription likelihood</span><span aria-hidden="true">↗</span></button><button class="reset-button" type="reset">Reset</button></div>
-            <p class="form-footnote">The form intentionally omits call duration because it is only known after a call.</p>
-          </form>
-        </div>
-        <aside class="result-panel" aria-live="polite">
-          <div class="result-top"><div class="eyebrow">MODEL ESTIMATE</div><span class="result-number">02</span></div>
-          <div id="result-empty" class="result-empty"><div class="chart-symbol"><span></span><span></span><span></span><span></span><span></span></div><h2>Your result<br>will appear here.</h2><p>Complete the profile and run an estimate to see the model output.</p></div>
-          <div id="result-content" hidden>
-            <div class="probability-label">Estimated subscription probability</div>
-            <div class="probability"><span id="probability-value">—</span><span>%</span></div>
-            <div class="meter"><div id="meter-fill"></div></div>
-            <div class="outcome" id="outcome">Awaiting prediction</div>
-            <p id="result-note" class="result-note"></p>
-            <div class="result-divider"></div>
-            <div class="result-meta"><span>Decision threshold</span><strong id="threshold-value">50%</strong></div>
-            <div class="result-meta"><span>Model status</span><strong id="model-status">Ready</strong></div>
-          </div>
-          <div id="result-error" class="error-message" hidden></div>
-          <div class="result-disclaimer"><strong>Use responsibly</strong><p>Predictions can reflect historical bias and are not a substitute for customer consent, human review, or a campaign strategy grounded in evidence.</p></div>
-        </aside>
-      </section>
-      <section class="bottom-strip"><div><span class="strip-mark">↗</span><div><strong>Transparent by design</strong><p>Built around validation, class-imbalance-aware metrics, and leakage prevention.</p></div></div><a href="https://github.com/rushmanthnalluri/DepositWise" target="_blank" rel="noreferrer">View source on GitHub ↗</a></section>
-    </main>
-    <footer><span>DEPOSITWISE · ML WORKBENCH</span><span>Educational prototype · Not financial advice</span></footer>
-  </div>
-</body>
-</html>
+<div class="app-shell">
+<aside class="sidebar" id="sidebar">
+<a class="brand" href="#overview"><span class="brand-mark">D</span><span>deposit<span class="brand-light">wise</span><small>CAMPAIGN INTELLIGENCE</small></span></a>
+<div class="workspace-label">WORKSPACE</div>
+<nav class="nav-list" aria-label="Main navigation">
+<button class="nav-item active" data-view="overview"><span class="nav-icon">▦</span>Overview</button>
+<button class="nav-item" data-view="prediction"><span class="nav-icon">◉</span>Customer scoring</button>
+<button class="nav-item" data-view="dataset"><span class="nav-icon">▤</span>Data explorer</button>
+<button class="nav-item" data-view="models"><span class="nav-icon">⌘</span>Model lab</button>
+<button class="nav-item" data-view="evaluation"><span class="nav-icon">◫</span>Evaluation</button>
+<button class="nav-item" data-view="monitoring"><span class="nav-icon">⌁</span>Model health</button>
+</nav>
+<div class="workspace-label pipeline-label">ML WORKBENCH</div>
+<nav class="nav-list" aria-label="Machine learning pipeline">
+<button class="nav-item pipeline-item" data-stage="1"><span class="stage-number">01</span>Upload dataset</button><button class="nav-item pipeline-item" data-stage="2"><span class="stage-number">02</span>Feature inventory</button><button class="nav-item pipeline-item" data-stage="3"><span class="stage-number">03</span>Descriptive stats</button><button class="nav-item pipeline-item" data-stage="4"><span class="stage-number">04</span>Missing values</button><button class="nav-item pipeline-item" data-stage="5"><span class="stage-number">05</span>Visualize data</button><button class="nav-item pipeline-item" data-stage="6"><span class="stage-number">06</span>Preprocess</button><button class="nav-item pipeline-item" data-stage="7"><span class="stage-number">07</span>Train models</button><button class="nav-item pipeline-item" data-stage="8"><span class="stage-number">08</span>Evaluate models</button><button class="nav-item pipeline-item" data-stage="9"><span class="stage-number">09</span>Predict</button>
+</nav>
+<div class="sidebar-bottom"><span class="status-dot" id="sidebar-status"></span><div><strong id="sidebar-health">Connecting to API</strong><small>Deployment status</small></div><a href="/docs" target="_blank" rel="noreferrer" aria-label="API documentation">↗</a></div>
+</aside>
+<main class="main-area">
+<header class="topbar"><button class="mobile-menu" id="mobile-menu" aria-label="Open navigation">☰</button><div class="breadcrumbs"><span>DepositWise</span><span class="crumb-slash">/</span><strong id="page-crumb">Overview</strong></div><div class="top-actions"><span class="live-pill"><i></i><span id="api-status">Checking system</span></span><a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API reference ↗</a></div></header>
+<div class="page-wrap">
+<section class="view active" id="view-overview">
+<div class="page-heading"><div><div class="eyebrow">BANK MARKETING · INTELLIGENCE</div><h1>Campaign overview</h1><p>Understand customer propensity, inspect model quality, and turn campaign data into better decisions.</p></div><button class="button button-primary" data-go="prediction">Score a customer <span>↗</span></button></div>
+<div class="notice"><span class="notice-mark">i</span><span>Educational decision-support prototype. Scores are estimates, not guarantees; use consent-aware outreach and human review.</span></div>
+<div class="kpi-grid">
+<article class="kpi-card"><div class="kpi-label">DATASET RECORDS <span>↗</span></div><div class="kpi-value" id="kpi-rows">—</div><div class="kpi-foot">Bank Marketing dataset</div></article>
+<article class="kpi-card"><div class="kpi-label">SUBSCRIPTION RATE <span>↗</span></div><div class="kpi-value" id="kpi-rate">—</div><div class="kpi-foot">Positive class · historical data</div></article>
+<article class="kpi-card"><div class="kpi-label">TEST ROC-AUC <span>↗</span></div><div class="kpi-value" id="kpi-auc">—</div><div class="kpi-foot">Held-out test set</div></article>
+<article class="kpi-card"><div class="kpi-label">TEST F1 SCORE <span>↗</span></div><div class="kpi-value" id="kpi-f1">—</div><div class="kpi-foot">Validation-tuned threshold</div></article>
+</div>
+<div class="content-grid overview-grid">
+<article class="panel wide-panel"><div class="panel-header"><div><div class="eyebrow">MODEL PERFORMANCE</div><h2>At a glance</h2></div><button class="text-button" data-go="evaluation">Full evaluation ↗</button></div><div class="metric-bars" id="overview-metrics"><div class="empty-state">Loading metrics from the current model report…</div></div></article>
+<article class="panel"><div class="panel-header"><div><div class="eyebrow">ACTIVE MODEL</div><h2>Champion</h2></div><span class="pill pill-amber">Selected</span></div><div class="model-name" id="champion-name">Loading model…</div><p class="muted-copy">The champion is selected using validation performance, not the held-out test set.</p><div class="divider"></div><div class="detail-row"><span>Selection metric</span><strong id="selection-metric">—</strong></div><div class="detail-row"><span>Decision threshold</span><strong id="decision-threshold">—</strong></div><button class="button button-secondary full-width" data-go="models">Open model lab</button></article>
+</div>
+<div class="bottom-grid"><article class="panel"><div class="panel-header"><div><div class="eyebrow">MODEL SIGNALS</div><h2>Top influential features</h2></div><button class="text-button" data-go="evaluation">Explore ↗</button></div><div id="feature-list" class="feature-list"><div class="empty-state">Loading feature importance…</div></div></article><article class="panel"><div class="panel-header"><div><div class="eyebrow">QUICK ACTIONS</div><h2>Continue your workflow</h2></div></div><div class="action-list"><button data-go="prediction"><span class="action-symbol">◉</span><span><strong>Score a customer</strong><small>Estimate term-deposit subscription likelihood</small></span><b>→</b></button><button data-go="dataset"><span class="action-symbol">▤</span><span><strong>Explore a dataset</strong><small>Upload a CSV/XLSX and inspect its structure</small></span><b>→</b></button><button data-go="monitoring"><span class="action-symbol">⌁</span><span><strong>Check model health</strong><small>Inspect API status and monitoring readiness</small></span><b>→</b></button></div></article></div>
+</section>
+<section class="view" id="view-prediction">
+<div class="page-heading"><div><div class="eyebrow">INFERENCE WORKSPACE</div><h1>Customer scoring</h1><p>Estimate subscription propensity from customer attributes and campaign history.</p></div><span class="pill pill-green">Model-backed</span></div>
+<div class="prediction-layout"><article class="panel form-panel"><div class="panel-header"><div><div class="eyebrow">CUSTOMER PROFILE</div><h2>Campaign inputs</h2></div><span class="stage-chip">01 / 02</span></div>
+<form id="prediction-form"><div class="form-grid">
+<label>Age<input name="age" type="number" min="18" max="110" value="35" required></label><label>Account balance<input name="balance" type="number" value="1200" required></label>
+<label>Job<select name="job"><option>management</option><option>admin.</option><option>technician</option><option>blue-collar</option><option>services</option><option>retired</option><option>student</option><option>unemployed</option><option>entrepreneur</option><option>housemaid</option><option>self-employed</option><option>unknown</option></select></label>
+<label>Marital status<select name="marital"><option>married</option><option>single</option><option>divorced</option></select></label>
+<label>Education<select name="education"><option>tertiary</option><option>secondary</option><option>primary</option><option>unknown</option></select></label><label>Credit default<select name="default"><option>no</option><option>yes</option></select></label>
+<label>Housing loan<select name="housing"><option>yes</option><option>no</option></select></label><label>Personal loan<select name="loan"><option>no</option><option>yes</option></select></label>
+<label>Contact method<select name="contact"><option>cellular</option><option>telephone</option><option>unknown</option></select></label><label>Last contact day<input name="day" type="number" min="1" max="31" value="15" required></label>
+<label>Last contact month<select name="month"><option>may</option><option>jan</option><option>feb</option><option>mar</option><option>apr</option><option>jun</option><option>jul</option><option>aug</option><option>sep</option><option>oct</option><option>nov</option><option>dec</option></select></label>
+<label>Contacts this campaign<input name="campaign" type="number" min="1" value="1" required></label><label>Days since previous contact<input name="pdays" type="number" value="-1" required><small>-1 means no previous contact recorded</small></label>
+<label>Previous contacts<input name="previous" type="number" min="0" value="0" required></label><label>Previous campaign outcome<select name="poutcome"><option>unknown</option><option>success</option><option>failure</option><option>other</option></select></label>
+</div><div class="form-actions"><button class="button button-primary" id="submit-button" type="submit">Estimate likelihood <span>↗</span></button><button class="button button-ghost" type="reset">Reset</button></div><p class="form-footnote">Call duration is excluded to prevent post-call target leakage.</p></form></article>
+<aside class="panel result-panel" aria-live="polite"><div class="panel-header"><div><div class="eyebrow">MODEL ESTIMATE</div><h2>Prediction result</h2></div><span class="pill pill-neutral">Live API</span></div><div id="result-empty" class="result-empty"><div class="empty-chart"><i></i><i></i><i></i><i></i><i></i></div><h3>Your result appears here.</h3><p>Complete the customer profile and request an estimate.</p></div><div id="result-content" hidden><div class="probability-label">Estimated subscription probability</div><div class="probability"><span id="probability-value">—</span><small>%</small></div><div class="meter"><div id="meter-fill"></div></div><div id="outcome" class="outcome">Awaiting prediction</div><p id="result-note" class="muted-copy"></p><div class="divider"></div><div class="detail-row"><span>Decision threshold</span><strong id="threshold-value">—</strong></div><div class="detail-row"><span>Selected model</span><strong id="prediction-model">—</strong></div></div><div id="result-error" class="error-message" hidden></div><div class="disclaimer"><strong>Responsible use</strong><p>Historical patterns can encode bias. Review scores alongside customer preferences and applicable policy.</p></div></aside></div>
+</section>
+<section class="view" id="view-dataset"><div class="page-heading"><div><div class="eyebrow">DATA QUALITY & EXPLORATION</div><h1>Data explorer</h1><p>Inspect CSV or Excel data before considering it for model training.</p></div></div><div class="panel upload-panel"><div class="upload-drop" id="upload-drop"><div class="upload-symbol">↑</div><h2>Bring your campaign data</h2><p>Upload a CSV or XLSX to profile its rows, columns, missing values, and sample records. This preview does not retrain the deployed model.</p><label class="button button-primary upload-button">Choose dataset<input id="dataset-file" type="file" accept=".csv,.xlsx" hidden></label><span class="muted-copy" id="upload-filename">CSV/XLSX · max 10 MB</span></div><div id="profile-output" hidden></div><div id="upload-error" class="error-message" hidden></div></div><div class="content-grid"><article class="panel"><div class="panel-header"><div><div class="eyebrow">BUNDLED DATASET</div><h2>Training dataset profile</h2></div></div><div class="detail-row"><span>Rows</span><strong id="data-rows">—</strong></div><div class="detail-row"><span>Target prevalence</span><strong id="data-rate">—</strong></div><div class="detail-row"><span>Target</span><strong>y</strong></div><div class="detail-row"><span>Leakage exclusion</span><strong>duration</strong></div></article><article class="panel"><div class="panel-header"><div><div class="eyebrow">DATA QUALITY</div><h2>What to check</h2></div></div><ul class="check-list"><li>Target and feature schema consistency</li><li>Missing values and duplicate records</li><li>Class imbalance before choosing metrics</li><li>Post-outcome fields that could leak information</li></ul></article></div></section>
+<section class="view" id="view-models"><div class="page-heading"><div><div class="eyebrow">EXPERIMENT & MODEL REGISTRY</div><h1>Model lab</h1><p>Compare the available candidate models using validation evidence.</p></div><span class="pill pill-amber" id="model-count">Loading candidates</span></div><div class="panel"><div class="panel-header"><div><div class="eyebrow">VALIDATION COMPARISON</div><h2>Candidate leaderboard</h2></div><span class="muted-copy">Selection uses validation data</span></div><div class="table-wrap"><table><thead><tr><th>Model</th><th>Average precision</th><th>ROC-AUC</th><th>F1</th><th>Status</th></tr></thead><tbody id="model-table"><tr><td colspan="5">Loading model report…</td></tr></tbody></table></div></div><div class="notice notice-muted"><span class="notice-mark">i</span><span>Fresh training, arbitrary model selection, and persistent experiment runs are not yet connected to this deployed workbench. The table reflects the report generated by the current training pipeline.</span></div></section>
+<section class="view" id="view-evaluation"><div class="page-heading"><div><div class="eyebrow">HONEST MODEL ASSESSMENT</div><h1>Evaluation & explainability</h1><p>Inspect held-out performance, threshold trade-offs, calibration, and the strongest model signals.</p></div></div><div class="kpi-grid evaluation-kpis"><article class="kpi-card"><div class="kpi-label">ROC-AUC</div><div class="kpi-value" id="eval-auc">—</div><div class="kpi-foot">Ranking quality</div></article><article class="kpi-card"><div class="kpi-label">PRECISION</div><div class="kpi-value" id="eval-precision">—</div><div class="kpi-foot">Positive predictions correct</div></article><article class="kpi-card"><div class="kpi-label">RECALL</div><div class="kpi-value" id="eval-recall">—</div><div class="kpi-foot">Positive cases identified</div></article><article class="kpi-card"><div class="kpi-label">BRIER SCORE</div><div class="kpi-value" id="eval-brier">—</div><div class="kpi-foot">Probability error · lower is better</div></article></div><div class="content-grid"><article class="panel"><div class="panel-header"><div><div class="eyebrow">THRESHOLD TRADE-OFF</div><h2>Operating point</h2></div></div><div class="threshold-display" id="threshold-display">—</div><div id="threshold-copy" class="muted-copy">Threshold is selected using validation data.</div><div class="divider"></div><div class="detail-row"><span>Test F1 at 0.5</span><strong id="baseline-f1">—</strong></div><div class="detail-row"><span>Test F1 tuned</span><strong id="tuned-f1">—</strong></div><div class="detail-row"><span>Test recall tuned</span><strong id="tuned-recall">—</strong></div><div class="detail-row"><span>Test precision tuned</span><strong id="tuned-precision">—</strong></div></article><article class="panel"><div class="panel-header"><div><div class="eyebrow">FEATURE IMPORTANCE</div><h2>What influences the model?</h2></div></div><div id="evaluation-features" class="feature-list"><div class="empty-state">Loading feature importance…</div></div></article></div><div class="panel table-panel"><div class="panel-header"><div><div class="eyebrow">METRIC DEFINITIONS</div><h2>Read the results correctly</h2></div></div><div class="definition-grid"><div><strong>Average precision</strong><p>Summarizes precision-recall performance and is useful when positive outcomes are uncommon.</p></div><div><strong>ROC-AUC</strong><p>Measures how well the model ranks positive examples above negative examples.</p></div><div><strong>Calibration</strong><p>Checks whether predicted probabilities align with observed outcome frequencies.</p></div></div></div></section>
+<section class="view" id="view-monitoring"><div class="page-heading"><div><div class="eyebrow">OPERATIONS & RELIABILITY</div><h1>Model health</h1><p>Review API readiness and understand which production-monitoring controls are available.</p></div><span class="pill pill-green" id="health-badge">Checking</span></div><div class="kpi-grid"><article class="kpi-card"><div class="kpi-label">API STATUS</div><div class="kpi-value compact" id="health-api">Checking</div><div class="kpi-foot">Liveness endpoint</div></article><article class="kpi-card"><div class="kpi-label">MODEL ARTIFACT</div><div class="kpi-value compact" id="health-model">Checking</div><div class="kpi-foot">Artifact availability</div></article><article class="kpi-card"><div class="kpi-label">EVALUATION REPORT</div><div class="kpi-value compact" id="health-report">Checking</div><div class="kpi-foot">Training report availability</div></article><article class="kpi-card"><div class="kpi-label">DRIFT MONITORING</div><div class="kpi-value compact">Not wired</div><div class="kpi-foot">Requires traffic/reference pipeline</div></article></div><div class="content-grid"><article class="panel"><div class="panel-header"><div><div class="eyebrow">READINESS CHECKS</div><h2>Service diagnostics</h2></div><button class="text-button" id="refresh-health">Refresh ↻</button></div><div id="health-checks" class="check-rows"></div></article><article class="panel"><div class="panel-header"><div><div class="eyebrow">NEXT MLOPS CONTROLS</div><h2>Operational roadmap</h2></div></div><ul class="check-list"><li>Prediction event logging with privacy controls</li><li>Population Stability Index drift analysis</li><li>Segment-level fairness and error checks</li><li>Human-approved retraining and model promotion</li><li>Persistent experiment registry and model version history</li></ul></article></div></section>
+<section class="view" id="view-workflow"><div class="page-heading"><div><div class="eyebrow">GUIDED MACHINE LEARNING</div><h1 id="workflow-title">ML workbench</h1><p id="workflow-description">Move through the banking campaign modelling workflow step by step.</p></div><span class="stage-chip" id="workflow-stage">STAGE 01</span></div><div class="panel workflow-panel"><div class="workflow-progress"><span id="workflow-progress-fill"></span></div><div id="workflow-content"></div><div class="workflow-actions"><button class="button button-secondary" id="workflow-prev">← Previous stage</button><button class="button button-primary" id="workflow-next">Next stage →</button></div></div><div class="notice notice-muted"><span class="notice-mark">i</span><span>Available actions are connected to the deployed API where supported. Uploaded-data previews are exploratory and do not overwrite or retrain the production model.</span></div></section>
+<footer class="app-footer"><span>DEPOSITWISE <i>·</i> CAMPAIGN INTELLIGENCE</span><span>Educational prototype · <a href="https://github.com/rushmanthnalluri/DepositWise" target="_blank" rel="noreferrer">Source ↗</a></span></footer>
+</div></main></div>
+</body></html>
