@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -84,13 +85,26 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
     if len(raw) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="File exceeds the 10 MB upload limit.")
     try:
-        frame = pd.read_csv(io.BytesIO(raw), low_memory=False) if suffix == ".csv" else pd.read_excel(io.BytesIO(raw), engine="openpyxl")
+        if suffix == ".xlsx":
+            with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                members = archive.infolist()
+                if len(members) > 10_000:
+                    raise HTTPException(status_code=422, detail="Excel file contains too many internal records.")
+                if sum(member.file_size for member in members) > 100 * 1024 * 1024:
+                    raise HTTPException(status_code=413, detail="Excel file expands beyond the 100 MB safety limit.")
+            frame = pd.read_excel(io.BytesIO(raw), engine="openpyxl")
+        else:
+            frame = pd.read_csv(io.BytesIO(raw), low_memory=False)
     except Exception as exc:
         raise HTTPException(status_code=422, detail="Could not parse this file. Check that it is a valid CSV or XLSX.") from exc
     if frame.empty or len(frame.columns) == 0:
         raise HTTPException(status_code=422, detail="The file contains no usable rows or columns.")
     if len(frame.columns) > 300:
         raise HTTPException(status_code=422, detail="The file has more than 300 columns; reduce it before profiling.")
+    if frame.columns.duplicated().any():
+        raise HTTPException(status_code=422, detail="The file contains duplicate column names. Rename them before profiling.")
+    if len(frame) > 250_000:
+        raise HTTPException(status_code=422, detail="The file has more than 250,000 rows; sample it before profiling.")
     columns = []
     for name in frame.columns:
         series = frame[name]
@@ -102,6 +116,14 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         })
     sample_frame = frame.head(8).astype(object).where(pd.notna(frame.head(8)), None)
     sample = json.loads(sample_frame.to_json(orient="records", date_format="iso"))
+    target_candidates = [name for name in frame.columns if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"}]
+    target_summary = None
+    if target_candidates:
+        target_name = target_candidates[0]
+        target_summary = {
+            "column": str(target_name),
+            "counts": {str(key): int(value) for key, value in frame[target_name].fillna("<missing>").astype(str).value_counts(dropna=False).items()},
+        }
     return {
         "filename": filename,
         "rows": int(len(frame)),
@@ -110,6 +132,7 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "duplicate_rows": int(frame.duplicated().sum()),
         "numeric_columns": int(len(frame.select_dtypes(include="number").columns)),
         "categorical_columns": int(len(frame.select_dtypes(exclude="number").columns)),
+        "target_summary": target_summary,
         "columns": columns,
         "sample": sample,
         "persisted": False,
