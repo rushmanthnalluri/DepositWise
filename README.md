@@ -22,7 +22,7 @@ The free Render service may sleep when idle. The Docker build downloads the publ
 ## Current capabilities
 
 - CSV loading, delimiter detection, and target validation.
-- Interactive EDA for uploads: feature inventory, descriptive statistics, missingness and duplicates, numeric/categorical distributions, target balance, numeric-feature summaries by outcome, segment subscription rates, and a numeric correlation heatmap.
+- Interactive EDA for both the bundled Bank Marketing dataset and uploads: feature inventory, descriptive statistics, missingness and duplicates, numeric/categorical distributions, target balance, numeric-feature summaries by outcome, segment subscription rates, and a numeric correlation heatmap.
 - Leakage-aware preprocessing for numeric and categorical features.
 - Four-model benchmarking: Logistic Regression, Random Forest, Extra Trees, and Gradient Boosting; users can select a candidate for live scoring, and sandbox runs can benchmark a chosen subset.
 - Model selection by validation average precision, with ROC-AUC, precision, recall, F1, balanced accuracy, Brier score, and confusion matrix reporting.
