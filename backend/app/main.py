@@ -5,7 +5,7 @@ import json
 import os
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 from uuid import uuid4
 
@@ -14,10 +14,14 @@ import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from ml.train import build_pipeline, choose_f1_threshold, evaluate
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from ml.train import choose_f1_threshold, evaluate
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT / "frontend"
@@ -38,6 +42,9 @@ class SandboxTrainingRequest(BaseModel):
     target: str = Field(..., min_length=1, max_length=128)
     models: list[str] = Field(default_factory=lambda: ["logistic_regression", "random_forest", "extra_trees"])
     row_limit: int = Field(default=20000, ge=100, le=20000)
+    numeric_imputation: Literal["median", "mean"] = "median"
+    categorical_imputation: Literal["most_frequent", "constant"] = "most_frequent"
+    scale_numeric: bool = True
 
 
 class SandboxPredictionRequest(BaseModel):
@@ -233,6 +240,22 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
 
 
 
+
+def build_sandbox_pipeline(X: pd.DataFrame, classifier, numeric_imputation: str, categorical_imputation: str, scale_numeric: bool) -> Pipeline:
+    """Build a configurable preprocessing pipeline for sandbox runs only."""
+    numeric = X.select_dtypes(include="number").columns.tolist()
+    categorical = [column for column in X.columns if column not in numeric]
+    numeric_steps = [("imputer", SimpleImputer(strategy=numeric_imputation))]
+    if scale_numeric:
+        numeric_steps.append(("scale", StandardScaler()))
+    categorical_imputer = SimpleImputer(strategy="constant", fill_value="missing") if categorical_imputation == "constant" else SimpleImputer(strategy="most_frequent")
+    preprocessing = ColumnTransformer([
+        ("numeric", Pipeline(numeric_steps), numeric),
+        ("categorical", Pipeline([("imputer", categorical_imputer), ("encode", OneHotEncoder(handle_unknown="ignore"))]), categorical),
+    ])
+    return Pipeline([("preprocess", preprocessing), ("classifier", classifier)])
+
+
 @app.post("/workflow/{dataset_id}/train")
 def train_sandbox_models(dataset_id: str, request: SandboxTrainingRequest) -> dict[str, Any]:
     """Train temporary binary classifiers on an upload without replacing the production model."""
@@ -272,7 +295,7 @@ def train_sandbox_models(dataset_id: str, request: SandboxTrainingRequest) -> di
     validation_probabilities = {}
     for name in selected_names:
         try:
-            pipeline = build_pipeline(X_train, candidates[name])
+            pipeline = build_sandbox_pipeline(X_train, candidates[name], request.numeric_imputation, request.categorical_imputation, request.scale_numeric)
             pipeline.fit(X_train, y_train)
             probabilities = pipeline.predict_proba(X_val)[:, 1]
             result = evaluate(y_val, probabilities, threshold=0.5)
@@ -283,7 +306,7 @@ def train_sandbox_models(dataset_id: str, request: SandboxTrainingRequest) -> di
     champion = max(comparison, key=lambda result: result["average_precision"])
     champion_name = champion["model"]
     threshold, validation_f1 = choose_f1_threshold(y_val, validation_probabilities[champion_name])
-    final_pipeline = build_pipeline(X_train_val, candidates[champion_name])
+    final_pipeline = build_sandbox_pipeline(X_train_val, candidates[champion_name], request.numeric_imputation, request.categorical_imputation, request.scale_numeric)
     final_pipeline.fit(X_train_val, y_train_val)
     test_probabilities = final_pipeline.predict_proba(X_test)[:, 1]
     baseline_metrics = evaluate(y_test, test_probabilities, threshold=0.5)
@@ -298,6 +321,7 @@ def train_sandbox_models(dataset_id: str, request: SandboxTrainingRequest) -> di
         "sandbox_only": True,
         "rows": int(len(frame)),
         "feature_count": int(len(X.columns)),
+        "preprocessing_config": {"numeric_imputation": request.numeric_imputation, "categorical_imputation": request.categorical_imputation, "scale_numeric": request.scale_numeric},
         "target": request.target,
         "target_classes": classes,
         "selected_model": champion_name,
