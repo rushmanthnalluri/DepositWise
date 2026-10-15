@@ -162,6 +162,18 @@ async function uploadDataset(file){
  catch(e){$("#upload-error").textContent=e.message;$("#upload-error").hidden=false;$("#upload-filename").textContent=file.name;}
 }
 
+
+async function scoreUploadedBatch(){
+ const button=$("#batch-score-button");const error=$("#upload-error");error.hidden=true;button.disabled=true;button.textContent="Scoring rows…";
+ try{
+  const res=await fetch("/workflow/"+encodeURIComponent(activeDatasetId)+"/score-batch",{method:"POST"});
+  if(!res.ok){const data=await res.json();throw new Error(data.detail||"Batch scoring failed.");}
+  const blob=await res.blob();const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="depositwise_scored.csv";document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+  button.textContent="CSV downloaded";
+ }catch(e){error.textContent=e.message;error.hidden=false;button.textContent="Score full dataset ↓";}
+ finally{button.disabled=false;if(button.textContent==="Scoring rows…")button.textContent="Score full dataset ↓";}
+}
+
 async function trainSandboxDataset(){
  if(!activeDatasetId||!activeTargetColumn)return;
  const output=$("#sandbox-training-output");const button=$("#sandbox-train-button");button.disabled=true;button.textContent="Training sandbox models…";output.innerHTML='<div class="empty-state">Training isolated candidate models. This can take a little while.</div>';
