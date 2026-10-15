@@ -565,7 +565,7 @@ def predict_sandbox_model(dataset_id: str, request: SandboxPredictionRequest) ->
 
 @app.post("/predict")
 def predict(request: PredictionRequest) -> dict[str, Any]:
-    global PREDICTION_COUNT, LAST_PREDICTION_AT, DRIFT_SAMPLE_COUNT, FEATURE_REFERENCE
+    global PREDICTION_COUNT, LAST_PREDICTION_AT, DRIFT_SAMPLE_COUNT, FEATURE_REFERENCE, CATEGORICAL_REFERENCE
     started = time.perf_counter()
     if not MODEL_PATH.exists():
         raise HTTPException(status_code=503, detail="Model artifact is missing. Download the dataset and run: python -m ml.train")
@@ -573,6 +573,8 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
         artifact = joblib.load(MODEL_PATH)
         if not FEATURE_REFERENCE:
             FEATURE_REFERENCE = artifact.get("feature_reference", {})
+        if not CATEGORICAL_REFERENCE:
+            CATEGORICAL_REFERENCE = artifact.get("categorical_reference", {})
         selected_model = request.model or artifact.get("selected_model", "unknown")
         candidate_pipelines = artifact.get("candidate_pipelines", {})
         if request.model is not None and request.model not in candidate_pipelines:
@@ -625,6 +627,19 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
                 drift_updated = True
             except (TypeError, ValueError):
                 continue
+        for feature, reference in CATEGORICAL_REFERENCE.items():
+            value = request.customer.get(feature)
+            if value is None:
+                continue
+            labels = [str(label) for label in reference.get("labels", [])]
+            if not labels:
+                continue
+            label = str(value)
+            if label not in labels:
+                label = "__OTHER__" if "__OTHER__" in labels else labels[-1]
+            counts = LIVE_CATEGORICAL_COUNTS.setdefault(feature, {})
+            counts[label] = counts.get(label, 0) + 1
+            drift_updated = True
         if drift_updated:
             DRIFT_SAMPLE_COUNT += 1
         PREDICTION_COUNT += 1
