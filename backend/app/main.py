@@ -681,28 +681,97 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
         row = pd.DataFrame([request.customer]).reindex(columns=expected)
         probability = float(pipeline.predict_proba(row)[0, 1])
         explanations = []
-        baseline_customer = artifact.get("baseline_customer")
-        if isinstance(baseline_customer, dict) and baseline_customer:
-            try:
-                baseline_row = pd.DataFrame([baseline_customer]).reindex(columns=expected)
-                baseline_probability = float(pipeline.predict_proba(baseline_row)[0, 1])
-                for feature in expected:
-                    candidate = dict(baseline_customer)
-                    candidate[feature] = request.customer.get(feature, baseline_customer.get(feature))
-                    candidate_row = pd.DataFrame([candidate]).reindex(columns=expected)
-                    candidate_probability = float(pipeline.predict_proba(candidate_row)[0, 1])
-                    impact = candidate_probability - baseline_probability
-                    explanations.append({
-                        "feature": feature,
-                        "impact_probability": impact,
-                        "direction": "higher" if impact > 0 else "lower" if impact < 0 else "neutral",
-                        "customer_value": request.customer.get(feature),
-                        "baseline_value": baseline_customer.get(feature),
-                    })
-                explanations.sort(key=lambda item: abs(item["impact_probability"]), reverse=True)
-                explanations = explanations[:5]
-            except Exception:
-                explanations = []
+        explanation_method = "single-feature baseline sensitivity; not causal and not SHAP"
+        try:
+            background_raw = artifact.get("explanation_background")
+            if background_raw is None or len(background_raw) == 0:
+                raise ValueError("No train-only explanation background is available.")
+            import shap
+
+            preprocessor = pipeline.named_steps["preprocess"]
+            classifier = pipeline.named_steps["classifier"]
+            background_transformed = preprocessor.transform(background_raw.reindex(columns=expected))
+            row_transformed = preprocessor.transform(row)
+            encoded_names = preprocessor.get_feature_names_out()
+            if hasattr(classifier, "feature_importances_"):
+                explainer = shap.TreeExplainer(
+                    classifier,
+                    data=background_transformed,
+                    feature_perturbation="interventional",
+                    model_output="probability",
+                )
+                shap_values = explainer.shap_values(row_transformed, check_additivity=False)
+                impact_unit = "probability"
+            elif hasattr(classifier, "coef_"):
+                explainer = shap.LinearExplainer(classifier, background_transformed)
+                shap_values = explainer.shap_values(row_transformed)
+                impact_unit = "log-odds"
+            else:
+                raise ValueError("The selected estimator does not support the configured SHAP explainer.")
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
+            values = np.asarray(shap_values, dtype=float)
+            if values.ndim == 3:
+                values = values[0, :, 1] if values.shape[-1] > 1 else values[0, :, 0]
+            elif values.ndim == 2:
+                values = values[0]
+            else:
+                values = values.reshape(-1)
+            grouped_impacts: dict[str, float] = {}
+            categorical_columns = [
+                name for name in expected
+                if name not in (preprocessor.transformers_[0][2] if preprocessor.transformers_ else [])
+            ]
+            for encoded_name, value in zip(encoded_names, values):
+                encoded = str(encoded_name)
+                if encoded.startswith("numeric__"):
+                    feature_name = encoded.split("__", 1)[1]
+                elif encoded.startswith("categorical__"):
+                    encoded = encoded.split("__", 1)[1]
+                    matches = [name for name in categorical_columns if encoded == name or encoded.startswith(name + "_")]
+                    feature_name = max(matches, key=len) if matches else encoded
+                else:
+                    feature_name = encoded.split("__", 1)[-1]
+                grouped_impacts[feature_name] = grouped_impacts.get(feature_name, 0.0) + float(value)
+            explanations = [
+                {
+                    "feature": feature_name,
+                    "impact_value": impact,
+                    "impact_unit": impact_unit,
+                    "direction": "higher" if impact > 0 else "lower" if impact < 0 else "neutral",
+                    "customer_value": request.customer.get(feature_name),
+                }
+                for feature_name, impact in grouped_impacts.items()
+            ]
+            explanations.sort(key=lambda item: abs(item["impact_value"]), reverse=True)
+            explanations = explanations[:5]
+            explanation_method = "SHAP (" + impact_unit + ")"
+        except Exception:
+            explanations = []
+            baseline_customer = artifact.get("baseline_customer")
+            if isinstance(baseline_customer, dict) and baseline_customer:
+                try:
+                    baseline_row = pd.DataFrame([baseline_customer]).reindex(columns=expected)
+                    baseline_probability = float(pipeline.predict_proba(baseline_row)[0, 1])
+                    for feature in expected:
+                        candidate = dict(baseline_customer)
+                        candidate[feature] = request.customer.get(feature, baseline_customer.get(feature))
+                        candidate_row = pd.DataFrame([candidate]).reindex(columns=expected)
+                        candidate_probability = float(pipeline.predict_proba(candidate_row)[0, 1])
+                        impact = candidate_probability - baseline_probability
+                        explanations.append({
+                            "feature": feature,
+                            "impact_value": impact,
+                            "impact_unit": "probability",
+                            "impact_probability": impact,
+                            "direction": "higher" if impact > 0 else "lower" if impact < 0 else "neutral",
+                            "customer_value": request.customer.get(feature),
+                            "baseline_value": baseline_customer.get(feature),
+                        })
+                    explanations.sort(key=lambda item: abs(item["impact_value"]), reverse=True)
+                    explanations = explanations[:5]
+                except Exception:
+                    explanations = []
         threshold = float(request.threshold if request.threshold is not None else artifact.get("candidate_thresholds", {}).get(selected_model, artifact.get("threshold", 0.5)))
         drift_updated = False
         for feature, reference in FEATURE_REFERENCE.items():
@@ -762,7 +831,7 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
             "threshold": threshold,
             "selected_model": selected_model,
             "top_feature_impacts": explanations,
-            "explanation_method": "single-feature baseline sensitivity; not causal and not SHAP",
+            "explanation_method": explanation_method,
             "note": "Educational estimate, not a guarantee. Validate model quality and tune the decision threshold before operational use.",
         }
     except HTTPException:
