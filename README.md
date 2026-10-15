@@ -10,6 +10,14 @@ Use the [Kaggle Banking Dataset — Marketing Targets](https://www.kaggle.com/da
 
 Do not commit downloaded data, customer records, credentials, model artifacts, or generated reports. Check the dataset's terms before redistributing it.
 
+## Live demo
+
+- **Dashboard:** https://depositwise.onrender.com/dashboard
+- **API health:** https://depositwise.onrender.com/health
+- **Interactive API docs:** https://depositwise.onrender.com/docs
+
+The free Render service may sleep when idle. The dashboard can load without a trained model, but prediction requests remain unavailable until the model artifact is trained and supplied.
+
 ## Current capabilities
 
 - CSV loading, delimiter detection, and target validation.
@@ -158,8 +166,6 @@ tests/             API and ML tests
 
 ## Roadmap
 
-- Add a separate untouched test set and threshold selection based on campaign economics.
-- Add confusion matrix, calibration checks, feature explanations, and drift monitoring.
 - Add an untouched test set and threshold selection based on campaign economics.
 - Add confusion matrix, calibration checks, feature explanations, and drift monitoring.
 - Persist a trained model artifact in deployment so live predictions can run.
@@ -172,4 +178,4 @@ tests/             API and ML tests
 
 ## Status
 
-The API, browser workbench, model-training scaffold, Docker configuration, and CI are committed. The test suite has passed in GitHub Actions for Python 3.11 and 3.12. The Kaggle CSV has not been added and no trained model artifact is committed; prediction requests return a clear unavailable response until a model is trained and supplied. A Render service has been configured for deployment.
+The API, browser workbench, model-training scaffold, Docker configuration, and CI are committed. The test suite has passed in GitHub Actions for Python 3.11 and 3.12. The Kaggle CSV has not been added and no trained model artifact is committed; prediction requests return a clear unavailable response until a model is trained and supplied. The API and dashboard are live on Render. Prediction inference is not yet active because the Kaggle dataset has not been supplied and a trained model artifact has not been generated.
