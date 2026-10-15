@@ -1,3 +1,4 @@
+import io
 import joblib
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -220,7 +221,7 @@ def test_batch_scoring_exports_probabilities_and_classifications(tmp_path, monke
     response = client.post(f"/workflow/{upload.json()['dataset_id']}/score-batch")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
-    scored = pd.read_csv(pd.io.common.StringIO(response.text))
+    scored = pd.read_csv(io.StringIO(response.text))
     assert len(scored) == 20
     assert "depositwise_subscription_probability" in scored.columns
     assert "depositwise_predicted_subscription" in scored.columns
