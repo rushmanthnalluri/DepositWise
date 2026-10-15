@@ -1,4 +1,9 @@
+import joblib
+import pandas as pd
 from fastapi.testclient import TestClient
+from sklearn.linear_model import LogisticRegression
+
+from ml.train import build_pipeline
 
 from backend.app.main import app
 
@@ -146,3 +151,36 @@ def test_prediction_threshold_override_is_range_validated():
         json={"customer": {"age": 35}, "threshold": 1.5},
     )
     assert response.status_code == 422
+
+
+def test_predict_returns_baseline_sensitivity_and_honors_threshold(tmp_path, monkeypatch):
+    import backend.app.main as main
+
+    X = pd.DataFrame({
+        "age": list(range(20, 40)),
+        "balance": [100 + i * 10 for i in range(20)],
+        "job": ["admin." if i % 2 == 0 else "technician" for i in range(20)],
+    })
+    y = pd.Series([0, 1] * 10)
+    pipeline = build_pipeline(X, LogisticRegression(max_iter=500))
+    pipeline.fit(X, y)
+    model_path = tmp_path / "sandboxed-test-model.joblib"
+    joblib.dump({
+        "pipeline": pipeline,
+        "features": list(X.columns),
+        "selected_model": "logistic_regression",
+        "threshold": 0.5,
+        "baseline_customer": {"age": 29.5, "balance": 195.0, "job": "admin."},
+    }, model_path)
+    monkeypatch.setattr(main, "MODEL_PATH", model_path)
+
+    response = client.post(
+        "/predict",
+        json={"customer": {"age": 35, "balance": 300, "job": "technician"}, "threshold": 0.9},
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert result["threshold"] == 0.9
+    assert result["explanation_method"].startswith("single-feature baseline sensitivity")
+    assert len(result["top_feature_impacts"]) <= 5
+    assert all("impact_probability" in item for item in result["top_feature_impacts"])
