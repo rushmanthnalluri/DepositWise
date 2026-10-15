@@ -14,6 +14,9 @@ const stages = [
 ];
 let report = null;
 let activeDatasetId = null;
+let activeSandboxRunId = null;
+let activeSampleRow = null;
+let activeTargetColumn = null;
 let currentStage = 0;
 
 function showView(name, label) {
@@ -121,14 +124,40 @@ async function uploadDataset(file){
  try{const res=await fetch("/dataset/profile",{method:"POST",body});const data=await res.json();if(!res.ok)throw new Error(data.detail||"Could not profile dataset.");renderProfile(data);$("#upload-filename").textContent=file.name+" · profile ready";}
  catch(e){$("#upload-error").textContent=e.message;$("#upload-error").hidden=false;$("#upload-filename").textContent=file.name;}
 }
+
+async function trainSandboxDataset(){
+ if(!activeDatasetId||!activeTargetColumn)return;
+ const output=$("#sandbox-training-output");const button=$("#sandbox-train-button");button.disabled=true;button.textContent="Training sandbox models…";output.innerHTML='<div class="empty-state">Training isolated candidate models. This can take a little while.</div>';
+ try{
+  const res=await fetch("/workflow/"+encodeURIComponent(activeDatasetId)+"/train",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:activeTargetColumn,models:["logistic_regression","random_forest","extra_trees"],row_limit:20000})});
+  const data=await res.json();if(!res.ok)throw new Error(data.detail||"Sandbox training failed.");
+  activeSandboxRunId=data.run_id;
+  const rows=(data.validation_model_comparison||[]).map(m=>"<tr><td>"+esc(m.model)+"</td><td>"+fmt(m.average_precision,3)+"</td><td>"+fmt(m.roc_auc,3)+"</td><td>"+fmt(m.f1,3)+"</td><td class=\"table-status\">"+(m.model===data.selected_model?"CHAMPION":"CANDIDATE")+"</td></tr>").join("");
+  const example={...(activeSampleRow||{})};delete example[activeTargetColumn];
+  output.innerHTML='<div class="panel" style="margin-top:16px"><div class="panel-header"><div><div class="eyebrow">SANDBOX RUN · NOT PRODUCTION</div><h2>Training results</h2></div><span class="pill pill-green">Completed</span></div><div class="profile-summary"><div class="profile-chip"><small>Champion</small><strong>'+esc(data.selected_model)+'</strong></div><div class="profile-chip"><small>Test ROC-AUC</small><strong>'+fmt(data.final_test_metrics.roc_auc,3)+'</strong></div><div class="profile-chip"><small>Test F1</small><strong>'+fmt(data.final_test_metrics.f1,3)+'</strong></div><div class="profile-chip"><small>Test precision</small><strong>'+pct(data.final_test_metrics.precision,1)+'</strong></div><div class="profile-chip"><small>Test recall</small><strong>'+pct(data.final_test_metrics.recall,1)+'</strong></div><div class="profile-chip"><small>Threshold</small><strong>'+pct(data.threshold_selection.threshold,0)+'</strong></div></div><div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Validation AP</th><th>Validation ROC-AUC</th><th>Validation F1</th><th>Selection</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="muted-copy">This run is held in memory and does not change the production model. Test metrics are shown after validation-based model and threshold selection.</p><div class="divider"></div><h3>Sandbox prediction input (JSON)</h3><p class="muted-copy">An example feature row is prefilled below. Edit it to represent a new customer profile, and remove any fields not available at decision time.</p><textarea id="sandbox-customer-json" rows="7" style="width:100%;background:#101310;color:#e9eee5;border:1px solid #343a34;border-radius:7px;padding:12px;font:11px \'DM Mono\',monospace">'+esc(JSON.stringify(example,null,2))+'</textarea><button class="button button-primary" id="sandbox-score-button" style="margin-top:12px">Score sandbox profile ↗</button><div id="sandbox-prediction-output"></div></div>';
+  $("#sandbox-score-button").addEventListener("click",scoreSandboxCustomer);
+ }catch(error){output.innerHTML='<div class="error-message">'+esc(error.message)+'</div>';}
+ finally{button.disabled=false;button.textContent="Train sandbox models ↗";}
+}
+async function scoreSandboxCustomer(){
+ const output=$("#sandbox-prediction-output");
+ try{
+  const customer=JSON.parse($("#sandbox-customer-json").value);
+  if(!customer||Array.isArray(customer)||typeof customer!=="object")throw new Error("Enter a JSON object of customer features.");
+  const res=await fetch("/workflow/"+encodeURIComponent(activeDatasetId)+"/predict",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({run_id:activeSandboxRunId,customer})});
+  const data=await res.json();if(!res.ok)throw new Error(data.detail||"Sandbox prediction failed.");
+  output.innerHTML='<div class="notice" style="margin-top:14px"><span class="notice-mark">i</span><span>Sandbox estimate: <strong>'+pct(data.subscription_probability,1)+'</strong> positive-class probability · threshold '+pct(data.threshold,0)+' · '+(data.predicted_positive?"above threshold":"below threshold")+'. This is not a production prediction.</span></div>';
+ }catch(error){output.innerHTML='<div class="error-message">'+esc(error.message)+'</div>';}
+}
+
 function renderProfile(data){
- activeDatasetId=data.dataset_id||null;
+ activeDatasetId=data.dataset_id||null;activeSandboxRunId=null;activeSampleRow=(data.sample||[])[0]||null;activeTargetColumn=data.target_summary?.column||null;
  const cols=data.columns||[];const sample=data.sample||[];
  const summary=`<div class="profile-summary"><div class="profile-chip"><small>Rows</small><strong>${Number(data.rows).toLocaleString()}</strong></div><div class="profile-chip"><small>Columns</small><strong>${data.column_count}</strong></div><div class="profile-chip"><small>Missing cells</small><strong>${Number(data.missing_cells).toLocaleString()}</strong></div><div class="profile-chip"><small>Duplicate rows</small><strong>${Number(data.duplicate_rows).toLocaleString()}</strong></div><div class="profile-chip"><small>Numeric fields</small><strong>${data.numeric_columns}</strong></div><div class="profile-chip"><small>Categorical fields</small><strong>${data.categorical_columns}</strong></div></div>`;
  const table=`<div class="table-wrap"><table><thead><tr><th>Column</th><th>Type</th><th>Missing</th><th>Unique</th></tr></thead><tbody>${cols.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.dtype)}</td><td>${c.missing}</td><td>${c.unique}</td></tr>`).join("")}</tbody></table></div>`;
  const targetSummary=data.target_summary?'<div class="panel" style="margin:14px 0"><div class="eyebrow">TARGET DISTRIBUTION · '+esc(data.target_summary.column)+'</div><div class="feature-list" style="margin-top:12px">'+Object.entries(data.target_summary.counts).map(([label,count])=>'<div class="detail-row"><span>'+esc(label)+'</span><strong>'+Number(count).toLocaleString()+'</strong></div>').join("")+'</div></div>':"";
  const sampleTable=sample.length?`<div class="sample-table-wrap"><table class="sample-table"><thead><tr>${Object.keys(sample[0]).map(k=>`<th>${esc(k)}</th>`).join("")}</tr></thead><tbody>${sample.slice(0,8).map(row=>`<tr>${Object.values(row).map(v=>`<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:"";
- $("#profile-output").innerHTML=`<div class="panel-header"><div><div class="eyebrow">UPLOAD PROFILE</div><h2>${esc(data.filename)}</h2></div><span class="pill pill-green">Profile generated</span></div>${summary}${targetSummary}<h3>Column inventory</h3>${table}<h3>Sample records</h3>${sampleTable}<div class="profile-actions"><button class="button button-secondary" data-profile-action="features">Feature inventory</button><button class="button button-secondary" data-profile-action="statistics">Descriptive stats</button><button class="button button-secondary" data-profile-action="missing">Missing values</button><button class="button button-secondary" data-profile-action="visualization">Correlations & target</button></div><div id="profile-insights"></div><p class="muted-copy">This is a temporary exploratory profile. The uploaded file is not saved as the production dataset and does not retrain or replace the live model.</p>`;
+ $("#profile-output").innerHTML=`<div class="panel-header"><div><div class="eyebrow">UPLOAD PROFILE</div><h2>${esc(data.filename)}</h2></div><span class="pill pill-green">Profile generated</span></div>${summary}${targetSummary}<h3>Column inventory</h3>${table}<h3>Sample records</h3>${sampleTable}<div class="profile-actions"><button class="button button-secondary" data-profile-action="features">Feature inventory</button><button class="button button-secondary" data-profile-action="statistics">Descriptive stats</button><button class="button button-secondary" data-profile-action="missing">Missing values</button><button class="button button-secondary" data-profile-action="visualization">Correlations & target</button><button class="button button-primary" id="sandbox-train-button" type="button">Train sandbox models ↗</button></div><div id="profile-insights"></div><div id="sandbox-training-output"></div><p class="muted-copy">This is a temporary exploratory profile. The uploaded file is not saved as the production dataset and does not retrain or replace the live model.</p>`;
  $("#profile-output").hidden=false;
  $("[data-profile-action]").forEach(button=>button.addEventListener("click",()=>loadProfileInsight(button.dataset.profileAction)));
 }
