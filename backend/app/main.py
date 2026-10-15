@@ -1,5 +1,6 @@
 """DepositWise inference API and browser workbench."""
 from __future__ import annotations
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -42,7 +43,7 @@ def model_info() -> dict[str, Any]:
     if not REPORT_PATH.exists():
         raise HTTPException(status_code=404, detail="Evaluation report is not available yet.")
     try:
-        report = __import__("json").loads(REPORT_PATH.read_text(encoding="utf-8"))
+        report = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
         return {
             "selected_model": report.get("selected_model"),
             "rows": report.get("rows"),
