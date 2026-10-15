@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT / "frontend"
 MODEL_PATH = Path(os.getenv("DEPOSITWISE_MODEL_PATH", ROOT / "models/depositwise_model.joblib"))
 REPORT_PATH = ROOT / "reports/generated/model_comparison.json"
+PREDICTION_LOG_PATH = ROOT / "logs/predictions.jsonl"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_CACHED_DATASETS = 8
 PREDICTION_COUNT = 0
@@ -145,7 +146,8 @@ def metrics() -> dict[str, Any]:
         "drift_status": drift_status,
         "drift_features": drift_features[:10],
         "psi_thresholds": {"warning": 0.1, "drift": 0.2, "minimum_feature_samples": 50},
-        "privacy_note": "Only aggregate counts, binned numeric feature frequencies, and inference latency are retained in memory; raw customer features are not logged.",
+        "prediction_log_available": PREDICTION_LOG_PATH.exists(),
+        "privacy_note": "Prediction events log timestamp, model, probability, threshold, outcome, and latency only; raw customer feature values are not logged. The deployment filesystem may be ephemeral.",
     }
 
 
@@ -644,7 +646,21 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
             DRIFT_SAMPLE_COUNT += 1
         PREDICTION_COUNT += 1
         LAST_PREDICTION_AT = datetime.now(timezone.utc).isoformat()
-        PREDICTION_LATENCIES.append((time.perf_counter() - started) * 1000)
+        latency_ms = (time.perf_counter() - started) * 1000
+        PREDICTION_LATENCIES.append(latency_ms)
+        try:
+            PREDICTION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with PREDICTION_LOG_PATH.open("a", encoding="utf-8") as log_file:
+                log_file.write(json.dumps({
+                    "timestamp": LAST_PREDICTION_AT,
+                    "selected_model": selected_model,
+                    "probability": probability,
+                    "threshold": threshold,
+                    "predicted_subscription": bool(probability >= threshold),
+                    "latency_ms": round(latency_ms, 3),
+                }) + "\n")
+        except OSError:
+            pass
         return {
             "subscription_probability": probability,
             "predicted_subscription": bool(probability >= threshold),
