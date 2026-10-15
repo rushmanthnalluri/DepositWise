@@ -35,4 +35,8 @@ def test_pipeline_handles_unseen_categories_and_excludes_duration():
     sample = pd.DataFrame({"age": [30], "job": ["never-seen-before"]})
     probability = pipeline.predict_proba(sample)[0, 1]
     assert 0 <= probability <= 1
-    assert "duration" not in pipeline.named_steps["preprocess"].feature_names_in_
+    selected_columns = set()
+    for _, _, columns in pipeline.named_steps["preprocess"].transformers:
+        if isinstance(columns, list):
+            selected_columns.update(columns)
+    assert "duration" not in selected_columns
