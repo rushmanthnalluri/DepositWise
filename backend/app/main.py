@@ -18,7 +18,7 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
@@ -51,7 +51,7 @@ class PredictionRequest(BaseModel):
 
 class SandboxTrainingRequest(BaseModel):
     target: str = Field(..., min_length=1, max_length=128)
-    models: list[str] = Field(default_factory=lambda: ["logistic_regression", "random_forest", "extra_trees"])
+    models: list[str] = Field(default_factory=lambda: ["logistic_regression", "random_forest", "extra_trees", "gradient_boosting"])
     row_limit: int = Field(default=20000, ge=100, le=20000)
     numeric_imputation: Literal["median", "mean"] = "median"
     categorical_imputation: Literal["most_frequent", "constant"] = "most_frequent"
@@ -383,7 +383,7 @@ def build_sandbox_pipeline(X: pd.DataFrame, classifier, numeric_imputation: str,
     categorical_imputer = SimpleImputer(strategy="constant", fill_value="missing") if categorical_imputation == "constant" else SimpleImputer(strategy="most_frequent")
     preprocessing = ColumnTransformer([
         ("numeric", Pipeline(numeric_steps), numeric),
-        ("categorical", Pipeline([("imputer", categorical_imputer), ("encode", OneHotEncoder(handle_unknown="ignore"))]), categorical),
+        ("categorical", Pipeline([("imputer", categorical_imputer), ("encode", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]), categorical),
     ])
     return Pipeline([("preprocess", preprocessing), ("classifier", classifier)])
 
@@ -470,10 +470,11 @@ def train_sandbox_models(dataset_id: str, request: SandboxTrainingRequest) -> di
         "logistic_regression": LogisticRegression(max_iter=1200, class_weight="balanced", random_state=42),
         "random_forest": RandomForestClassifier(n_estimators=60, min_samples_leaf=2, class_weight="balanced_subsample", n_jobs=1, random_state=42),
         "extra_trees": ExtraTreesClassifier(n_estimators=60, min_samples_leaf=2, class_weight="balanced", n_jobs=1, random_state=42),
+        "gradient_boosting": GradientBoostingClassifier(n_estimators=80, learning_rate=0.05, max_depth=2, random_state=42),
     }
     selected_names = list(dict.fromkeys(request.models))
     if not selected_names or any(name not in candidates for name in selected_names):
-        raise HTTPException(status_code=422, detail="Choose supported models: logistic_regression, random_forest, extra_trees.")
+        raise HTTPException(status_code=422, detail="Choose supported models: logistic_regression, random_forest, extra_trees, gradient_boosting.")
     comparison = []
     validation_probabilities = {}
     for name in selected_names:
