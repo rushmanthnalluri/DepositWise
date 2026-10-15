@@ -44,3 +44,36 @@ def test_model_info_is_explicit_when_report_is_missing():
         assert "selected_model" in response.json()
     else:
         assert response.status_code == 404
+
+
+def test_dataset_profile_csv_is_in_memory_and_reports_quality():
+    response = client.post(
+        "/dataset/profile",
+        files={"file": ("campaign.csv", b"age,y\\n35,yes\\n42,no\\n,yes\\n", "text/csv")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["filename"] == "campaign.csv"
+    assert data["rows"] == 3
+    assert data["column_count"] == 2
+    assert data["missing_cells"] == 1
+    assert data["duplicate_rows"] == 0
+    assert data["persisted"] is False
+    assert data["training_triggered"] is False
+    assert len(data["sample"]) == 3
+
+
+def test_dataset_profile_rejects_unsupported_file_type():
+    response = client.post(
+        "/dataset/profile",
+        files={"file": ("campaign.json", b'{"age": 35}', "application/json")},
+    )
+    assert response.status_code == 415
+
+
+def test_dataset_profile_rejects_empty_csv():
+    response = client.post(
+        "/dataset/profile",
+        files={"file": ("empty.csv", b"", "text/csv")},
+    )
+    assert response.status_code == 400
