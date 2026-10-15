@@ -191,3 +191,36 @@ def test_psi_detects_distribution_shift_without_storing_raw_rows():
 
     assert compute_psi([0.5, 0.5], [0.5, 0.5]) == 0.0
     assert compute_psi([0.8, 0.2], [0.2, 0.8]) > 0.2
+
+
+def test_batch_scoring_exports_probabilities_and_classifications(tmp_path, monkeypatch):
+    import backend.app.main as main
+
+    X = pd.DataFrame({
+        "age": list(range(20, 40)),
+        "balance": [100 + i * 10 for i in range(20)],
+        "job": ["admin." if i % 2 == 0 else "technician" for i in range(20)],
+    })
+    y = pd.Series([0, 1] * 10)
+    pipeline = build_pipeline(X, LogisticRegression(max_iter=500))
+    pipeline.fit(X, y)
+    model_path = tmp_path / "batch-test-model.joblib"
+    joblib.dump({"pipeline": pipeline, "features": list(X.columns), "selected_model": "logistic_regression", "threshold": 0.5}, model_path)
+    monkeypatch.setattr(main, "MODEL_PATH", model_path)
+
+    dataset_rows = ["age,balance,job,y"]
+    for i in range(20):
+        dataset_rows.append(f"{20 + i},{100 + i * 10},{'admin.' if i % 2 == 0 else 'technician'},{'yes' if i % 2 else 'no'}")
+    upload = client.post(
+        "/dataset/profile",
+        files={"file": ("batch.csv", ("\\n".join(dataset_rows) + "\\n").encode(), "text/csv")},
+    )
+    assert upload.status_code == 200
+
+    response = client.post(f"/workflow/{upload.json()['dataset_id']}/score-batch")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    scored = pd.read_csv(pd.io.common.StringIO(response.text))
+    assert len(scored) == 20
+    assert "depositwise_subscription_probability" in scored.columns
+    assert "depositwise_predicted_subscription" in scored.columns
