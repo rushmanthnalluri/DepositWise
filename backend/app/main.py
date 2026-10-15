@@ -36,6 +36,8 @@ PREDICTION_COUNT = 0
 DRIFT_SAMPLE_COUNT = 0
 FEATURE_REFERENCE: dict[str, dict[str, list[float]]] = {}
 LIVE_FEATURE_COUNTS: dict[str, list[int]] = {}
+CATEGORICAL_REFERENCE: dict[str, dict[str, Any]] = {}
+LIVE_CATEGORICAL_COUNTS: dict[str, dict[str, int]] = {}
 PREDICTION_LATENCIES = deque(maxlen=500)
 LAST_PREDICTION_AT: str | None = None
 DATASET_CACHE: dict[str, pd.DataFrame] = {}
@@ -101,12 +103,15 @@ def compute_psi(reference: list[float], observed: list[float]) -> float:
 
 @app.get("/metrics")
 def metrics() -> dict[str, Any]:
-    global FEATURE_REFERENCE
-    if not FEATURE_REFERENCE and MODEL_PATH.exists():
+    global FEATURE_REFERENCE, CATEGORICAL_REFERENCE
+    if (not FEATURE_REFERENCE or not CATEGORICAL_REFERENCE) and MODEL_PATH.exists():
         try:
-            FEATURE_REFERENCE = joblib.load(MODEL_PATH).get("feature_reference", {})
+            artifact = joblib.load(MODEL_PATH)
+            FEATURE_REFERENCE = FEATURE_REFERENCE or artifact.get("feature_reference", {})
+            CATEGORICAL_REFERENCE = CATEGORICAL_REFERENCE or artifact.get("categorical_reference", {})
         except Exception:
-            FEATURE_REFERENCE = {}
+            FEATURE_REFERENCE = FEATURE_REFERENCE or {}
+            CATEGORICAL_REFERENCE = CATEGORICAL_REFERENCE or {}
     latencies = list(PREDICTION_LATENCIES)
     drift_features = []
     for feature, reference in FEATURE_REFERENCE.items():
@@ -117,6 +122,15 @@ def metrics() -> dict[str, Any]:
         observed = [count / total for count in counts]
         psi = compute_psi(reference.get("proportions", []), observed)
         drift_features.append({"feature": feature, "psi": psi, "samples": total})
+    for feature, reference in CATEGORICAL_REFERENCE.items():
+        labels = [str(label) for label in reference.get("labels", [])]
+        counts = LIVE_CATEGORICAL_COUNTS.get(feature, {})
+        total = sum(counts.values())
+        if total < 50 or not labels:
+            continue
+        observed = [counts.get(label, 0) / total for label in labels]
+        psi = compute_psi(reference.get("proportions", []), observed)
+        drift_features.append({"feature": feature, "kind": "categorical", "psi": psi, "samples": total})
     drift_features.sort(key=lambda item: item["psi"], reverse=True)
     max_psi = max((item["psi"] for item in drift_features), default=None)
     drift_status = "insufficient_data" if max_psi is None else "drift" if max_psi >= 0.2 else "warning" if max_psi >= 0.1 else "stable"
@@ -126,7 +140,7 @@ def metrics() -> dict[str, Any]:
         "mean_latency_ms": round(sum(latencies) / len(latencies), 2) if latencies else None,
         "last_prediction_at": LAST_PREDICTION_AT,
         "model_loaded": MODEL_PATH.exists(),
-        "drift_monitoring": "numeric_psi" if FEATURE_REFERENCE else "not_configured",
+        "drift_monitoring": "numeric_and_categorical_psi" if (FEATURE_REFERENCE or CATEGORICAL_REFERENCE) else "not_configured",
         "drift_sample_count": DRIFT_SAMPLE_COUNT,
         "drift_status": drift_status,
         "drift_features": drift_features[:10],
