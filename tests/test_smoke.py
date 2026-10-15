@@ -243,12 +243,12 @@ def test_dataset_profile_detects_semicolon_delimited_bank_marketing_csv():
     assert data["target_summary"]["column"] == "y"
 
 
-def test_uploaded_eda_reports_subscription_rates_by_categorical_segment():
-    rows = ["job,y"]
+def test_uploaded_eda_reports_subscription_rates_and_feature_distributions():
+    rows = ["age,job,y"]
     for i in range(40):
         job = "admin." if i < 20 else "technician"
         target = "yes" if i % 2 else "no"
-        rows.append(f"{job},{target}")
+        rows.append(f"${20 + i},{job},{target}")
     upload = client.post(
         "/dataset/profile",
         files={"file": ("segments.csv", ("\n".join(rows) + "\n").encode(), "text/csv")},
@@ -261,3 +261,10 @@ def test_uploaded_eda_reports_subscription_rates_by_categorical_segment():
     assert len(rates) == 2
     assert all(item["count"] == 20 for item in rates)
     assert all(item["positive_rate"] == 0.5 for item in rates)
+    payload = response.json()
+    assert payload["numeric_distributions"]
+    assert payload["numeric_distributions"][0]["feature"] == "age"
+    assert sum(payload["numeric_distributions"][0]["counts"]) == 40
+    assert payload["categorical_distributions"]
+    assert payload["categorical_distributions"][0]["feature"] == "job"
+    assert sum(payload["categorical_distributions"][0]["counts"]) == 40
