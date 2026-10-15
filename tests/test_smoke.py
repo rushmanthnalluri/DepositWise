@@ -141,7 +141,7 @@ def test_metrics_endpoint_reports_aggregate_data_without_customer_features():
     metrics = response.json()
     assert "prediction_count" in metrics
     assert "mean_latency_ms" in metrics
-    assert metrics["drift_monitoring"] == "not_configured"
+    assert metrics["drift_monitoring"] in {"not_configured", "numeric_psi"}
     assert "raw customer features are not logged" in metrics["privacy_note"]
 
 
@@ -184,3 +184,10 @@ def test_predict_returns_baseline_sensitivity_and_honors_threshold(tmp_path, mon
     assert result["explanation_method"].startswith("single-feature baseline sensitivity")
     assert len(result["top_feature_impacts"]) <= 5
     assert all("impact_probability" in item for item in result["top_feature_impacts"])
+
+
+def test_psi_detects_distribution_shift_without_storing_raw_rows():
+    from backend.app.main import compute_psi
+
+    assert compute_psi([0.5, 0.5], [0.5, 0.5]) == 0.0
+    assert compute_psi([0.8, 0.2], [0.2, 0.8]) > 0.2
