@@ -178,7 +178,7 @@ tests/             API and ML tests
 - Customer scoring calls the deployed model API and displays the estimated probability, selected threshold, and classification.
 - Model evaluation shows held-out metrics, validation-threshold context, candidate comparison where present, top encoded feature importance, a calibration curve, and a confusion matrix.
 - Uploaded datasets can run feature inventory, descriptive statistics, missing-value analysis, numeric correlation summaries, and target-distribution analysis.
-- Binary-classification sandbox training can compare Logistic Regression, Random Forest, and Extra Trees; select a champion using validation average precision; tune its threshold on validation data; report held-out test metrics; and score an edited JSON customer profile. Sandbox models stay in memory and never replace the deployed champion.
+- Binary-classification sandbox training can compare Logistic Regression, Random Forest, and Extra Trees; configure numeric mean/median imputation, categorical most-frequent/constant imputation, and numeric scaling; select a champion using validation average precision; tune its threshold on validation data; report held-out test metrics; and score an edited JSON customer profile. Sandbox models stay in memory and never replace the deployed champion.
 - Model-health page distinguishes actual API/model availability from monitoring capabilities that are not yet wired up.
 - Keyboard focus states, responsive layouts, reduced-motion support, upload-size/type checks, and API error states are included.
 
@@ -186,7 +186,7 @@ tests/             API and ML tests
 
 The interface and core interaction patterns are being adapted from [PropPulse](https://github.com/rushmanthnalluri/prop-pulse) and [PlacementPredict](https://github.com/rushmanthnalluri/placement-predict), with banking-specific equivalents instead of property valuation or student salary functionality.
 
-**Not yet implemented:** configurable preprocessing policies, persistent experiment tracking/model registry, per-prediction SHAP explanations, campaign lift and cost optimization, prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The guided workbench now connects upload, profiling, EDA, sandbox training, evaluation, and sandbox scoring; preprocessing configuration and persistent run management remain future work.
+**Not yet implemented:** persistent experiment tracking/model registry, per-prediction SHAP explanations, campaign lift and cost optimization, prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The guided workbench now connects upload, profiling, EDA, sandbox training, evaluation, and sandbox scoring; preprocessing configuration and persistent run management remain future work.
 
 ## Roadmap
 
