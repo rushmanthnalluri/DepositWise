@@ -38,7 +38,7 @@ function renderReport(data){
  const base=data.final_test_metrics_at_0_5||{};
  const rows=Number(data.rows);
  $("#kpi-rows").textContent=Number.isFinite(rows)?rows.toLocaleString():"—";
- $("#kpi-rate").textContent=data.positive_rate!=null?pct(data.positive_rate):"11.7%";
+ $("#kpi-rate").textContent=(data.positive_rate_full_dataset??data.positive_rate)!=null?pct(data.positive_rate_full_dataset??data.positive_rate):"11.7%";
  $("#kpi-auc").textContent=fmt(metrics.roc_auc,3);
  $("#kpi-f1").textContent=fmt(metrics.f1,3);
  $("#champion-name").textContent=data.selected_model||"Not available";
@@ -60,7 +60,7 @@ function renderReport(data){
  $("#tuned-recall").textContent=pct(metrics.recall,1);
  $("#tuned-precision").textContent=pct(metrics.precision,1);
  $("#data-rows").textContent=Number.isFinite(rows)?rows.toLocaleString():"—";
- $("#data-rate").textContent=data.positive_rate!=null?pct(data.positive_rate):"11.7%";
+ $("#data-rate").textContent=(data.positive_rate_full_dataset??data.positive_rate)!=null?pct(data.positive_rate_full_dataset??data.positive_rate):"11.7%";
  const candidates=data.validation_model_comparison||[];
  $("#model-count").textContent=`${candidates.length} candidate models`;
  $("#model-table").innerHTML=candidates.map(x=>{const name=x.model??x.name??x.model_name??"Candidate";const ap=x.average_precision??x.ap??x.validation_average_precision;const auc=x.roc_auc??x.roc_auc_score;const f1=x.f1??x.validation_f1;const selected=String(name)===String(data.selected_model);return `<tr><td>${esc(name)}</td><td>${fmt(ap,3)}</td><td>${fmt(auc,3)}</td><td>${fmt(f1,3)}</td><td class="table-status">${selected?"CHAMPION":"CANDIDATE"}</td></tr>`;}).join("")||'<tr><td colspan="5">Candidate metrics are not included in the current report.</td></tr>';
