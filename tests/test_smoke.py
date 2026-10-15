@@ -230,7 +230,7 @@ def test_batch_scoring_exports_probabilities_and_classifications(tmp_path, monke
 def test_dataset_profile_detects_semicolon_delimited_bank_marketing_csv():
     response = client.post(
         "/dataset/profile",
-        files={"file": ("bank-full.csv", b"age;job;y\\n35;management;yes\\n42;technician;no\\n", "text/csv")},
+        files={"file": ("bank-full.csv", b"age;job;y\n35;management;yes\n42;technician;no\n", "text/csv")},
     )
     assert response.status_code == 200
     data = response.json()
