@@ -12,6 +12,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 import joblib
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
@@ -32,6 +33,9 @@ REPORT_PATH = ROOT / "reports/generated/model_comparison.json"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_CACHED_DATASETS = 8
 PREDICTION_COUNT = 0
+DRIFT_SAMPLE_COUNT = 0
+FEATURE_REFERENCE: dict[str, dict[str, list[float]]] = {}
+LIVE_FEATURE_COUNTS: dict[str, list[int]] = {}
 PREDICTION_LATENCIES = deque(maxlen=500)
 LAST_PREDICTION_AT: str | None = None
 DATASET_CACHE: dict[str, pd.DataFrame] = {}
@@ -80,17 +84,46 @@ def dashboard() -> HTMLResponse:
 
 
 
+def compute_psi(reference: list[float], observed: list[float]) -> float:
+    """Population Stability Index from binned proportions, with numerical smoothing."""
+    if len(reference) != len(observed) or not reference:
+        return 0.0
+    ref = np.asarray(reference, dtype=float)
+    cur = np.asarray(observed, dtype=float)
+    ref = np.clip(ref, 1e-6, None)
+    cur = np.clip(cur, 1e-6, None)
+    ref = ref / ref.sum()
+    cur = cur / cur.sum()
+    return float(np.sum((cur - ref) * np.log(cur / ref)))
+
+
 @app.get("/metrics")
 def metrics() -> dict[str, Any]:
     latencies = list(PREDICTION_LATENCIES)
+    drift_features = []
+    for feature, reference in FEATURE_REFERENCE.items():
+        counts = LIVE_FEATURE_COUNTS.get(feature, [])
+        total = sum(counts)
+        if total < 50:
+            continue
+        observed = [count / total for count in counts]
+        psi = compute_psi(reference.get("proportions", []), observed)
+        drift_features.append({"feature": feature, "psi": psi, "samples": total})
+    drift_features.sort(key=lambda item: item["psi"], reverse=True)
+    max_psi = max((item["psi"] for item in drift_features), default=None)
+    drift_status = "insufficient_data" if max_psi is None else "drift" if max_psi >= 0.2 else "warning" if max_psi >= 0.1 else "stable"
     return {
         "prediction_count": PREDICTION_COUNT,
         "recent_sample_count": len(latencies),
         "mean_latency_ms": round(sum(latencies) / len(latencies), 2) if latencies else None,
         "last_prediction_at": LAST_PREDICTION_AT,
         "model_loaded": MODEL_PATH.exists(),
-        "drift_monitoring": "not_configured",
-        "privacy_note": "Only aggregate counts and inference latency are retained in memory; raw customer features are not logged.",
+        "drift_monitoring": "numeric_psi" if FEATURE_REFERENCE else "not_configured",
+        "drift_sample_count": DRIFT_SAMPLE_COUNT,
+        "drift_status": drift_status,
+        "drift_features": drift_features[:10],
+        "psi_thresholds": {"warning": 0.1, "drift": 0.2, "minimum_feature_samples": 50},
+        "privacy_note": "Only aggregate counts, binned numeric feature frequencies, and inference latency are retained in memory; raw customer features are not logged.",
     }
 
 
@@ -374,12 +407,14 @@ def predict_sandbox_model(dataset_id: str, request: SandboxPredictionRequest) ->
 
 @app.post("/predict")
 def predict(request: PredictionRequest) -> dict[str, Any]:
-    global PREDICTION_COUNT, LAST_PREDICTION_AT
+    global PREDICTION_COUNT, LAST_PREDICTION_AT, DRIFT_SAMPLE_COUNT, FEATURE_REFERENCE
     started = time.perf_counter()
     if not MODEL_PATH.exists():
         raise HTTPException(status_code=503, detail="Model artifact is missing. Download the dataset and run: python -m ml.train")
     try:
         artifact = joblib.load(MODEL_PATH)
+        if not FEATURE_REFERENCE:
+            FEATURE_REFERENCE = artifact.get("feature_reference", {})
         pipeline = artifact["pipeline"]
         expected = artifact["features"]
         row = pd.DataFrame([request.customer]).reindex(columns=expected)
@@ -408,6 +443,28 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
             except Exception:
                 explanations = []
         threshold = float(request.threshold if request.threshold is not None else artifact.get("threshold", 0.5))
+        drift_updated = False
+        for feature, reference in FEATURE_REFERENCE.items():
+            value = request.customer.get(feature)
+            if value is None:
+                continue
+            try:
+                numeric_value = float(value)
+                if not np.isfinite(numeric_value):
+                    continue
+                edges = reference.get("edges", [])
+                proportions = reference.get("proportions", [])
+                if len(edges) < 2 or not proportions:
+                    continue
+                bucket = int(np.searchsorted(edges[1:-1], numeric_value, side="right"))
+                bucket = max(0, min(bucket, len(proportions) - 1))
+                counts = LIVE_FEATURE_COUNTS.setdefault(feature, [0] * len(proportions))
+                counts[bucket] += 1
+                drift_updated = True
+            except (TypeError, ValueError):
+                continue
+        if drift_updated:
+            DRIFT_SAMPLE_COUNT += 1
         PREDICTION_COUNT += 1
         LAST_PREDICTION_AT = datetime.now(timezone.utc).isoformat()
         PREDICTION_LATENCIES.append((time.perf_counter() - started) * 1000)
