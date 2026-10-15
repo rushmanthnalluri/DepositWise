@@ -281,3 +281,21 @@ def test_uploaded_eda_reports_subscription_rates_and_feature_distributions():
     assert "correlation_matrix" in payload
     assert payload["numeric_target_summary"]
     assert {item["target_label"] for item in payload["numeric_target_summary"]} == {"yes", "no"}
+
+
+def test_bundled_dataset_overview_exposes_full_eda_payload(monkeypatch):
+    import backend.app.main as main
+
+    frame = pd.DataFrame({
+        "age": list(range(20, 60)),
+        "job": ["admin." if i < 20 else "technician" for i in range(40)],
+        "y": ["yes" if i % 2 else "no" for i in range(40)],
+    })
+    monkeypatch.setattr(main, "BUNDLED_FRAME", frame)
+    response = client.get("/dataset/overview")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["rows"] == 40
+    assert payload["target_summary"]["column"] == "y"
+    assert payload["visualization"]["numeric_distributions"]
+    assert payload["visualization"]["categorical_target_rates"]
