@@ -184,6 +184,7 @@ def main() -> None:
     comparison = []
     fitted = {}
     validation_probabilities = {}
+    candidate_thresholds = {}
     for name, classifier in candidates.items():
         pipeline = build_pipeline(X_train, classifier)
         pipeline.fit(X_train, y_train)
@@ -192,6 +193,7 @@ def main() -> None:
         comparison.append({"model": name, **metrics})
         fitted[name] = pipeline
         validation_probabilities[name] = probabilities
+        candidate_thresholds[name] = choose_f1_threshold(y_val, probabilities)[0]
         print(f"Validation {name}: average_precision={metrics['average_precision']:.4f}, ROC-AUC={metrics['roc_auc']:.4f}")
 
     best = max(comparison, key=lambda result: result["average_precision"])
@@ -240,8 +242,15 @@ def main() -> None:
             modes = X_train_val[column].dropna().mode()
             baseline_customer[column] = modes.iloc[0] if not modes.empty else "unknown"
     feature_reference = build_numeric_feature_reference(X_train_val)
+    candidate_pipelines = {}
+    for candidate_name, candidate_classifier in candidates.items():
+        candidate_pipeline = build_pipeline(X_train_val, candidate_classifier)
+        candidate_pipeline.fit(X_train_val, y_train_val)
+        candidate_pipelines[candidate_name] = candidate_pipeline
     joblib.dump({
         "pipeline": final_pipeline,
+        "candidate_pipelines": candidate_pipelines,
+        "candidate_thresholds": candidate_thresholds,
         "features": list(X.columns),
         "selected_model": best["model"],
         "threshold": validation_threshold,
