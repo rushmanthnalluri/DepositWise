@@ -248,7 +248,7 @@ def test_uploaded_eda_reports_subscription_rates_and_feature_distributions():
     for i in range(40):
         job = "admin." if i < 20 else "technician"
         target = "yes" if i % 2 else "no"
-        rows.append(f"${20 + i},{job},{target}")
+        rows.append(f"{20 + i},{job},{target}")
     upload = client.post(
         "/dataset/profile",
         files={"file": ("segments.csv", ("\n".join(rows) + "\n").encode(), "text/csv")},
