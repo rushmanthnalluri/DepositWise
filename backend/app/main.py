@@ -284,10 +284,30 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
     frame = _get_uploaded_dataset(dataset_id)
     target_candidates = [name for name in frame.columns if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"}]
     target = None
+    categorical_target_rates = []
     if target_candidates:
         column = target_candidates[0]
         counts = frame[column].fillna("<missing>").astype(str).value_counts(dropna=False)
         target = {"column": str(column), "labels": [str(key) for key in counts.index], "counts": [int(value) for value in counts.values]}
+        raw_target = frame[column]
+        labels = raw_target.astype(str)
+        known = sorted(raw_target.dropna().astype(str).unique().tolist())
+        positive_label = next((label for label in known if label.lower() in {"yes", "1", "true"}), known[-1] if known else None)
+        positive = labels.eq(positive_label).astype(float).where(raw_target.notna()) if positive_label is not None else pd.Series(np.nan, index=frame.index)
+        for feature in frame.select_dtypes(exclude="number").columns:
+            if feature == column or frame[feature].nunique(dropna=True) > 20:
+                continue
+            grouped = pd.DataFrame({"group": frame[feature].fillna("<missing>").astype(str), "positive": positive}).groupby("group", dropna=False)
+            for group, values in grouped:
+                valid = values["positive"].dropna()
+                if len(valid) >= 10:
+                    categorical_target_rates.append({
+                        "feature": str(feature),
+                        "group": str(group),
+                        "count": int(len(valid)),
+                        "positive_rate": float(valid.mean()),
+                    })
+        categorical_target_rates.sort(key=lambda item: (item["feature"], -item["positive_rate"]))
     numeric = frame.select_dtypes(include="number")
     correlations = []
     if len(numeric.columns) > 1:
@@ -297,7 +317,7 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
             for other in names[i + 1:]:
                 correlations.append({"feature_a": str(column), "feature_b": str(other), "correlation": float(corr.loc[column, other])})
         correlations.sort(key=lambda item: abs(item["correlation"]), reverse=True)
-    return {"dataset_id": dataset_id, "target_distribution": target, "top_numeric_correlations": correlations[:30]}
+    return {"dataset_id": dataset_id, "target_distribution": target, "categorical_target_rates": categorical_target_rates[:200], "top_numeric_correlations": correlations[:30]}
 
 
 
