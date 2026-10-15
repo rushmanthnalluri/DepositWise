@@ -40,3 +40,17 @@ def test_pipeline_handles_unseen_categories_and_excludes_duration():
         if isinstance(columns, list):
             selected_columns.update(columns)
     assert "duration" not in selected_columns
+
+
+def test_threshold_selection_uses_validation_probabilities():
+    from ml.train import choose_f1_threshold, evaluate
+
+    labels = pd.Series([0, 0, 0, 1, 1, 1])
+    probabilities = pd.Series([0.08, 0.22, 0.41, 0.38, 0.67, 0.91])
+    threshold, validation_f1 = choose_f1_threshold(labels, probabilities)
+    assert 0.1 <= threshold <= 0.9
+    assert 0 <= validation_f1 <= 1
+    metrics = evaluate(labels, probabilities, threshold=threshold)
+    assert "brier_score" in metrics
+    assert "balanced_accuracy" in metrics
+    assert metrics["confusion_matrix"]["true_positive"] >= 1
