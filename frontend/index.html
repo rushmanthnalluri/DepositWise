@@ -48,7 +48,7 @@
 <section class="view" id="view-prediction">
 <div class="page-heading"><div><div class="eyebrow">INFERENCE WORKSPACE</div><h1>Customer scoring</h1><p>Estimate subscription propensity from customer attributes and campaign history.</p></div><span class="pill pill-green">Model-backed</span></div>
 <div class="prediction-layout"><article class="panel form-panel"><div class="panel-header"><div><div class="eyebrow">CUSTOMER PROFILE</div><h2>Campaign inputs</h2></div><span class="stage-chip">01 / 02</span></div>
-<form id="prediction-form"><div class="form-grid">
+<form id="prediction-form"><div class="form-grid"><label>Prediction model<select name="model"><option value="">Recommended champion</option><option value="logistic_regression">Logistic Regression</option><option value="random_forest">Random Forest</option><option value="gradient_boosting">Gradient Boosting</option><option value="extra_trees">Extra Trees</option></select><small>Each candidate uses its own validation-tuned threshold unless you override it.</small></label>
 <label>Age<input name="age" type="number" min="18" max="110" value="35" required></label><label>Account balance<input name="balance" type="number" value="1200" required></label>
 <label>Job<select name="job"><option>management</option><option>admin.</option><option>technician</option><option>blue-collar</option><option>services</option><option>retired</option><option>student</option><option>unemployed</option><option>entrepreneur</option><option>housemaid</option><option>self-employed</option><option>unknown</option></select></label>
 <label>Marital status<select name="marital"><option>married</option><option>single</option><option>divorced</option></select></label>
