@@ -186,6 +186,49 @@ def build_categorical_feature_reference(frame: pd.DataFrame, max_categories: int
     return reference
 
 
+
+def evaluate_subgroups(X: pd.DataFrame, y_true, probabilities, threshold: float, minimum_group_size: int = 50) -> dict[str, object]:
+    """Descriptive subgroup metrics for review; not a legal fairness certification."""
+    truth = np.asarray(y_true, dtype=int)
+    predicted = (np.asarray(probabilities) >= threshold).astype(int)
+    groups: dict[str, pd.Series] = {}
+    if "age" in X.columns:
+        groups["age_band"] = pd.cut(
+            pd.to_numeric(X["age"], errors="coerce"),
+            bins=[-np.inf, 30, 45, 60, np.inf],
+            labels=["30_or_younger", "31_to_45", "46_to_60", "over_60"],
+        ).astype("object").fillna("<missing>")
+    for feature in ["marital", "education", "job", "contact", "housing", "loan"]:
+        if feature in X.columns and X[feature].nunique(dropna=True) <= 25:
+            groups[feature] = X[feature].fillna("<missing>").astype(str)
+    results = []
+    for feature, series in groups.items():
+        values = series.astype(str).to_numpy()
+        for group in sorted(set(values)):
+            mask = values == group
+            count = int(mask.sum())
+            if count < minimum_group_size:
+                continue
+            y_group = truth[mask]
+            p_group = predicted[mask]
+            tn, fp, fn, tp = confusion_matrix(y_group, p_group, labels=[0, 1]).ravel()
+            results.append({
+                "feature": feature,
+                "group": group,
+                "count": count,
+                "observed_subscription_rate": float(y_group.mean()) if count else 0.0,
+                "predicted_positive_rate": float(p_group.mean()) if count else 0.0,
+                "precision": float(precision_score(y_group, p_group, zero_division=0)),
+                "recall": float(recall_score(y_group, p_group, zero_division=0)),
+                "false_positive_rate": float(fp / (fp + tn)) if (fp + tn) else 0.0,
+            })
+    return {
+        "minimum_group_size": minimum_group_size,
+        "metrics": results,
+        "caveat": "Descriptive subgroup diagnostics only. Differences may reflect sampling, base rates, or model error; review context and legal requirements before use.",
+    }
+
+
 def main() -> None:
     frame = read_dataset(DATA_PATH)
     y = frame.pop("y").map({"no": 0, "yes": 1}).astype(int)
@@ -223,6 +266,7 @@ def main() -> None:
     test_probabilities = final_pipeline.predict_proba(X_test)[:, 1]
     test_metrics_baseline = evaluate(y_test, test_probabilities, threshold=0.5)
     test_metrics_tuned = evaluate(y_test, test_probabilities, threshold=validation_threshold)
+    subgroup_evaluation = evaluate_subgroups(X_test, y_test, test_probabilities, validation_threshold)
     fraction_positive, mean_predicted = calibration_curve(y_test, test_probabilities, n_bins=10, strategy="quantile")
     report = {
         "project": "DepositWise",
@@ -244,6 +288,7 @@ def main() -> None:
         "candidate_thresholds": {name: float(value) for name, value in candidate_thresholds.items()},
         "final_test_metrics_at_0_5": test_metrics_baseline,
         "final_test_metrics": test_metrics_tuned,
+        "subgroup_evaluation": subgroup_evaluation,
         "test_calibration_curve": [{"mean_predicted_probability": float(predicted), "observed_positive_fraction": float(observed)} for predicted, observed in zip(mean_predicted, fraction_positive)],
         "top_encoded_feature_importance": top_encoded_feature_importance(final_pipeline),
         "limitations": [
