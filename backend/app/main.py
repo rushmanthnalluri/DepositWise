@@ -338,12 +338,35 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
             for other in names[i + 1:]:
                 correlations.append({"feature_a": str(column), "feature_b": str(other), "correlation": float(corr.loc[column, other])})
         correlations.sort(key=lambda item: abs(item["correlation"]), reverse=True)
+    correlation_matrix = {"features": [], "values": []}
+    if len(numeric.columns) > 1:
+        selected_numeric = numeric.iloc[:, :10]
+        matrix = selected_numeric.corr(numeric_only=True).fillna(0)
+        correlation_matrix = {
+            "features": [str(name) for name in matrix.columns],
+            "values": [[float(value) for value in row] for row in matrix.to_numpy()],
+        }
+    numeric_target_summary = []
+    if target_candidates:
+        target_name = target_candidates[0]
+        target_labels = frame[target_name].dropna().astype(str).unique().tolist()
+        if len(target_labels) <= 10:
+            for feature in list(numeric.columns)[:15]:
+                for label in target_labels:
+                    vals = pd.to_numeric(frame.loc[frame[target_name].astype(str) == label, feature], errors="coerce").dropna()
+                    if len(vals):
+                        numeric_target_summary.append({
+                            "feature": str(feature), "target_label": str(label), "count": int(len(vals)),
+                            "mean": float(vals.mean()), "median": float(vals.median()),
+                        })
     return {
         "dataset_id": dataset_id,
         "target_distribution": target,
         "categorical_target_rates": categorical_target_rates[:200],
         "numeric_distributions": numeric_distributions,
         "categorical_distributions": categorical_distributions,
+        "numeric_target_summary": numeric_target_summary[:100],
+        "correlation_matrix": correlation_matrix,
         "top_numeric_correlations": correlations[:30],
     }
 
