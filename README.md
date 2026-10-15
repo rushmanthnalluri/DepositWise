@@ -186,13 +186,13 @@ tests/             API and ML tests
 
 The interface and core interaction patterns are being adapted from [PropPulse](https://github.com/rushmanthnalluri/prop-pulse) and [PlacementPredict](https://github.com/rushmanthnalluri/placement-predict), with banking-specific equivalents instead of property valuation or student salary functionality.
 
-**Not yet implemented:** persistent experiment tracking/model registry, SHAP-based local explanations, campaign lift and cost optimization, feature-value prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The current metrics endpoint deliberately retains only aggregate counts and latency, not raw customer features. The guided workbench now connects upload, profiling, EDA, sandbox training, evaluation, and sandbox scoring; preprocessing configuration and persistent run management remain future work.
+**Not yet implemented:** persistent experiment tracking/model registry, SHAP-based local explanations, campaign lift and cost optimization, feature-value prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The current metrics endpoint deliberately retains only aggregate counts and latency, not raw customer features. The guided workbench now connects upload, profiling, EDA, configurable preprocessing, sandbox training, evaluation, and sandbox scoring; persistent run management remains future work.
 
 ## Roadmap
 
-1. Complete the upload-to-evaluation sandbox pipeline with schema validation, configurable preprocessing, training jobs, and comparison reports.
-2. Add per-prediction explanations and campaign lift/cost scenarios.
-3. Implement privacy-aware prediction logging, feature-drift monitoring, and human-approved retraining recommendations.
+1. Add schema templates, richer dataset-specific validation, and persistent experiment/run history.
+2. Add SHAP-based local explanations and campaign lift/cost scenarios.
+3. Implement privacy-aware feature-drift monitoring and human-approved retraining recommendations.
 4. Add subgroup/fairness evaluation and temporal validation for future campaigns.
 
 ## References
