@@ -299,3 +299,22 @@ def test_bundled_dataset_overview_exposes_full_eda_payload(monkeypatch):
     assert payload["target_summary"]["column"] == "y"
     assert payload["visualization"]["numeric_distributions"]
     assert payload["visualization"]["categorical_target_rates"]
+
+
+def test_eda_reports_monthly_campaign_volume_and_subscription_rate():
+    rows = ["month,y"]
+    for i in range(40):
+        month = "jan" if i < 20 else "feb"
+        target = "yes" if i % 2 else "no"
+        rows.append(f"{month},{target}")
+    upload = client.post(
+        "/dataset/profile",
+        files={"file": ("monthly.csv", ("\n".join(rows) + "\n").encode(), "text/csv")},
+    )
+    assert upload.status_code == 200
+    response = client.get(f"/workflow/{upload.json()['dataset_id']}/visualization")
+    assert response.status_code == 200
+    trends = response.json()["campaign_trends"]
+    assert [item["month"] for item in trends] == ["jan", "feb"]
+    assert all(item["contacts"] == 20 for item in trends)
+    assert all(item["subscription_rate"] == 0.5 for item in trends)
