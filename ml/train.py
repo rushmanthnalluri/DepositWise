@@ -222,6 +222,7 @@ def main() -> None:
         "random_state": RANDOM_STATE,
         "validation_model_comparison": comparison,
         "threshold_selection": {"method": "maximize F1 on validation split", "threshold": validation_threshold, "validation_f1_at_selected_threshold": validation_best_f1},
+        "candidate_thresholds": {name: float(value) for name, value in candidate_thresholds.items()},
         "final_test_metrics_at_0_5": test_metrics_baseline,
         "final_test_metrics": test_metrics_tuned,
         "test_calibration_curve": [{"mean_predicted_probability": float(predicted), "observed_positive_fraction": float(observed)} for predicted, observed in zip(mean_predicted, fraction_positive)],
