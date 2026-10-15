@@ -14,8 +14,8 @@ from uuid import uuid4
 import joblib
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
@@ -315,6 +315,46 @@ def build_sandbox_pipeline(X: pd.DataFrame, classifier, numeric_imputation: str,
         ("categorical", Pipeline([("imputer", categorical_imputer), ("encode", OneHotEncoder(handle_unknown="ignore"))]), categorical),
     ])
     return Pipeline([("preprocess", preprocessing), ("classifier", classifier)])
+
+
+
+@app.post("/workflow/{dataset_id}/score-batch")
+def score_uploaded_batch(dataset_id: str, threshold: float | None = Query(default=None, ge=0.0, le=1.0)) -> StreamingResponse:
+    """Score up to 20,000 uploaded rows with the production model and return a CSV download."""
+    frame = _get_uploaded_dataset(dataset_id).copy(deep=True)
+    if len(frame) > 20000:
+        raise HTTPException(status_code=413, detail="Batch scoring is limited to 20,000 rows per request.")
+    if not MODEL_PATH.exists():
+        raise HTTPException(status_code=503, detail="Production model artifact is unavailable.")
+    try:
+        artifact = joblib.load(MODEL_PATH)
+        expected = artifact["features"]
+        pipeline = artifact["pipeline"]
+        target_candidates = [name for name in frame.columns if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"}]
+        features = frame.drop(columns=target_candidates + ["duration"], errors="ignore").reindex(columns=expected)
+        probabilities = pipeline.predict_proba(features)[:, 1]
+        selected_threshold = float(threshold if threshold is not None else artifact.get("threshold", 0.5))
+        output = frame.copy()
+        output["depositwise_subscription_probability"] = probabilities
+        output["depositwise_predicted_subscription"] = np.where(probabilities >= selected_threshold, "yes", "no")
+        for column in output.select_dtypes(include=["object", "string"]).columns:
+            output[column] = output[column].map(lambda value: "'" + value if isinstance(value, str) and value.startswith(("=", "+", "-", "@")) else value)
+        buffer = io.StringIO()
+        output.to_csv(buffer, index=False)
+        content = buffer.getvalue()
+        return StreamingResponse(
+            iter([content]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": 'attachment; filename="depositwise_scored.csv"',
+                "X-Scored-Rows": str(len(output)),
+                "X-Decision-Threshold": str(selected_threshold),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Could not batch-score this dataset. Check that its feature schema matches the production model.") from exc
 
 
 @app.post("/workflow/{dataset_id}/train")
