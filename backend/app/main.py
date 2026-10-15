@@ -47,6 +47,7 @@ app = FastAPI(title="DepositWise API", description="Term-deposit subscription pr
 class PredictionRequest(BaseModel):
     customer: dict[str, Any] = Field(..., description="Dataset feature names and values, excluding target y and post-call duration.")
     threshold: float | None = Field(default=None, ge=0.0, le=1.0, description="Optional decision threshold override for what-if analysis.")
+    model: str | None = Field(default=None, max_length=64, description="Optional trained candidate model key.")
 
 
 class SandboxTrainingRequest(BaseModel):
@@ -557,7 +558,11 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
         artifact = joblib.load(MODEL_PATH)
         if not FEATURE_REFERENCE:
             FEATURE_REFERENCE = artifact.get("feature_reference", {})
-        pipeline = artifact["pipeline"]
+        selected_model = request.model or artifact.get("selected_model", "unknown")
+        candidate_pipelines = artifact.get("candidate_pipelines", {})
+        if request.model is not None and request.model not in candidate_pipelines:
+            raise HTTPException(status_code=422, detail="Unknown model choice. Available models: " + ", ".join(sorted(candidate_pipelines)))
+        pipeline = candidate_pipelines.get(selected_model, artifact["pipeline"])
         expected = artifact["features"]
         row = pd.DataFrame([request.customer]).reindex(columns=expected)
         probability = float(pipeline.predict_proba(row)[0, 1])
@@ -584,7 +589,7 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
                 explanations = explanations[:5]
             except Exception:
                 explanations = []
-        threshold = float(request.threshold if request.threshold is not None else artifact.get("threshold", 0.5))
+        threshold = float(request.threshold if request.threshold is not None else artifact.get("candidate_thresholds", {}).get(selected_model, artifact.get("threshold", 0.5)))
         drift_updated = False
         for feature, reference in FEATURE_REFERENCE.items():
             value = request.customer.get(feature)
@@ -614,7 +619,7 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
             "subscription_probability": probability,
             "predicted_subscription": bool(probability >= threshold),
             "threshold": threshold,
-            "selected_model": artifact.get("selected_model", "unknown"),
+            "selected_model": selected_model,
             "top_feature_impacts": explanations,
             "explanation_method": "single-feature baseline sensitivity; not causal and not SHAP",
             "note": "Educational estimate, not a guarantee. Validate model quality and tune the decision threshold before operational use.",
