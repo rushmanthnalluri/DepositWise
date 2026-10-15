@@ -318,3 +318,34 @@ def test_eda_reports_monthly_campaign_volume_and_subscription_rate():
     assert [item["month"] for item in trends] == ["jan", "feb"]
     assert all(item["contacts"] == 20 for item in trends)
     assert all(item["subscription_rate"] == 0.5 for item in trends)
+
+
+def test_campaign_lift_reports_deciles_and_cumulative_capture(tmp_path, monkeypatch):
+    import backend.app.main as main
+
+    X = pd.DataFrame({
+        "age": list(range(20, 60)),
+        "balance": [100 + i * 20 for i in range(40)],
+        "job": ["admin." if i % 2 == 0 else "technician" for i in range(40)],
+    })
+    y = pd.Series([0, 1] * 20)
+    pipeline = build_pipeline(X, LogisticRegression(max_iter=500))
+    pipeline.fit(X, y)
+    model_path = tmp_path / "lift-test-model.joblib"
+    joblib.dump({"pipeline": pipeline, "features": list(X.columns), "selected_model": "logistic_regression"}, model_path)
+    monkeypatch.setattr(main, "MODEL_PATH", model_path)
+    rows = ["age,balance,job,y"]
+    for i in range(40):
+        rows.append(f"{20+i},{100+i*20},{'admin.' if i%2==0 else 'technician'},{'no' if i%2==0 else 'yes'}")
+    upload = client.post(
+        "/dataset/profile",
+        files={"file": ("lift.csv", ("\n".join(rows) + "\n").encode(), "text/csv")},
+    )
+    assert upload.status_code == 200
+    response = client.get(f"/workflow/{upload.json()['dataset_id']}/lift")
+    assert response.status_code == 200
+    result = response.json()
+    assert result["rows"] == 40
+    assert len(result["deciles"]) == 10
+    assert all("lift_vs_baseline" in item for item in result["deciles"])
+    assert result["deciles"][-1]["cumulative_conversion_capture"] == 1.0
