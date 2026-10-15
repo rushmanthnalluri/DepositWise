@@ -49,7 +49,11 @@ def model_info() -> dict[str, Any]:
             "rows": report.get("rows"),
             "selection_metric": report.get("selection_metric"),
             "validation_model_comparison": report.get("validation_model_comparison", []),
+            "threshold_selection": report.get("threshold_selection"),
+            "final_test_metrics_at_0_5": report.get("final_test_metrics_at_0_5"),
             "final_test_metrics": report.get("final_test_metrics"),
+            "test_calibration_curve": report.get("test_calibration_curve", []),
+            "top_encoded_feature_importance": report.get("top_encoded_feature_importance", []),
             "excluded_features": report.get("excluded_features", []),
             "limitations": report.get("limitations", []),
         }
