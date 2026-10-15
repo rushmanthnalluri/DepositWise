@@ -13,3 +13,6 @@
 @media(max-width:520px){.economics-grid{grid-template-columns:1fr}}
 
 .model-options{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:#111411;margin:12px 0}.model-options strong{font-size:10px;color:#c8d0c4;margin-right:4px}.model-options label{display:inline-flex;align-items:center;gap:6px;font-size:10px;color:#aeb7ab}.model-options input{accent-color:var(--amber)}
+
+.eda-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0 20px}.eda-chart{min-width:0;padding:13px;border:1px solid var(--line);border-radius:8px;background:#111411}.eda-chart h4{font-size:11px;font-weight:600;margin:0 0 12px;overflow-wrap:anywhere}.eda-bar-row{display:grid;grid-template-columns:minmax(64px,1fr) minmax(45px,1.3fr) auto;align-items:center;gap:7px;margin:8px 0;font-size:9px;color:#aeb7ab}.eda-bar-row>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.eda-bar-row>b{font:9px 'DM Mono',monospace;color:#e4e9df}.eda-bar-track{height:7px;border-radius:5px;background:#292e28;overflow:hidden}.eda-bar-track>i{display:block;height:100%;background:var(--amber);border-radius:5px;min-width:1px}
+@media(max-width:720px){.eda-chart-grid{grid-template-columns:1fr}}
