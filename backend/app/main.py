@@ -3,10 +3,12 @@ from __future__ import annotations
 import io
 import json
 import os
+import time
 import zipfile
+from collections import deque
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
-from uuid import uuid4
 from uuid import uuid4
 
 import joblib
@@ -29,6 +31,9 @@ MODEL_PATH = Path(os.getenv("DEPOSITWISE_MODEL_PATH", ROOT / "models/depositwise
 REPORT_PATH = ROOT / "reports/generated/model_comparison.json"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_CACHED_DATASETS = 8
+PREDICTION_COUNT = 0
+PREDICTION_LATENCIES = deque(maxlen=500)
+LAST_PREDICTION_AT: str | None = None
 DATASET_CACHE: dict[str, pd.DataFrame] = {}
 SANDBOX_MODELS: dict[str, dict[str, Any]] = {}
 app = FastAPI(title="DepositWise API", description="Term-deposit subscription propensity prediction for educational use.", version="0.3.0")
@@ -71,6 +76,22 @@ def dashboard() -> HTMLResponse:
     page = page.replace('<script src="/static/app.js" defer></script>', "")
     page = page.replace("</body>", f"<script>{script}</script></body>")
     return HTMLResponse(content=page)
+
+
+
+@app.get("/metrics")
+def metrics() -> dict[str, Any]:
+    latencies = list(PREDICTION_LATENCIES)
+    return {
+        "prediction_count": PREDICTION_COUNT,
+        "recent_sample_count": len(latencies),
+        "mean_latency_ms": round(sum(latencies) / len(latencies), 2) if latencies else None,
+        "last_prediction_at": LAST_PREDICTION_AT,
+        "model_loaded": MODEL_PATH.exists(),
+        "drift_monitoring": "not_configured",
+        "privacy_note": "Only aggregate counts and inference latency are retained in memory; raw customer features are not logged.",
+    }
+
 
 
 @app.get("/model-info")
@@ -352,6 +373,8 @@ def predict_sandbox_model(dataset_id: str, request: SandboxPredictionRequest) ->
 
 @app.post("/predict")
 def predict(request: PredictionRequest) -> dict[str, Any]:
+    global PREDICTION_COUNT, LAST_PREDICTION_AT
+    started = time.perf_counter()
     if not MODEL_PATH.exists():
         raise HTTPException(status_code=503, detail="Model artifact is missing. Download the dataset and run: python -m ml.train")
     try:
@@ -361,6 +384,9 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
         row = pd.DataFrame([request.customer]).reindex(columns=expected)
         probability = float(pipeline.predict_proba(row)[0, 1])
         threshold = float(artifact.get("threshold", 0.5))
+        PREDICTION_COUNT += 1
+        LAST_PREDICTION_AT = datetime.now(timezone.utc).isoformat()
+        PREDICTION_LATENCIES.append((time.perf_counter() - started) * 1000)
         return {
             "subscription_probability": probability,
             "predicted_subscription": bool(probability >= threshold),
