@@ -237,3 +237,23 @@ def test_dataset_profile_detects_semicolon_delimited_bank_marketing_csv():
     assert data["column_count"] == 3
     assert [column["name"] for column in data["columns"]] == ["age", "job", "y"]
     assert data["target_summary"]["column"] == "y"
+
+
+def test_uploaded_eda_reports_subscription_rates_by_categorical_segment():
+    rows = ["job,y"]
+    for i in range(40):
+        job = "admin." if i < 20 else "technician"
+        target = "yes" if i % 2 else "no"
+        rows.append(f"{job},{target}")
+    upload = client.post(
+        "/dataset/profile",
+        files={"file": ("segments.csv", ("\n".join(rows) + "\n").encode(), "text/csv")},
+    )
+    assert upload.status_code == 200
+    dataset_id = upload.json()["dataset_id"]
+    response = client.get(f"/workflow/{dataset_id}/visualization")
+    assert response.status_code == 200
+    rates = response.json()["categorical_target_rates"]
+    assert len(rates) == 2
+    assert all(item["count"] == 20 for item in rates)
+    assert all(item["positive_rate"] == 0.5 for item in rates)
