@@ -497,6 +497,61 @@ def score_uploaded_batch(dataset_id: str, threshold: float | None = Query(defaul
         raise HTTPException(status_code=422, detail="Could not batch-score this dataset. Check that its feature schema matches the production model.") from exc
 
 
+@app.get("/workflow/{dataset_id}/lift")
+def uploaded_campaign_lift(dataset_id: str) -> dict[str, Any]:
+    """Measure ranking lift on a labelled, schema-compatible campaign dataset."""
+    frame = _get_uploaded_dataset(dataset_id).copy(deep=True)
+    target_column = next((name for name in frame.columns if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"}), None)
+    if target_column is None:
+        raise HTTPException(status_code=422, detail="Campaign lift requires a labelled target column such as y.")
+    labels = frame[target_column].astype(str).str.strip().str.lower()
+    mapping = {"yes": 1, "no": 0, "1": 1, "0": 0, "true": 1, "false": 0}
+    target = labels.map(mapping)
+    valid = target.notna()
+    frame = frame.loc[valid].copy()
+    target = target.loc[valid].astype(int)
+    if target.nunique() != 2:
+        raise HTTPException(status_code=422, detail="Campaign lift requires both positive and negative target examples.")
+    if not MODEL_PATH.exists():
+        raise HTTPException(status_code=503, detail="Production model artifact is unavailable.")
+    artifact = joblib.load(MODEL_PATH)
+    features = artifact["features"]
+    source = frame.drop(columns=[target_column, "duration"], errors="ignore")
+    missing = [name for name in features if name not in source.columns]
+    if missing:
+        raise HTTPException(status_code=422, detail="Campaign lift requires the production feature schema. Missing: " + ", ".join(missing[:10]))
+    probabilities = artifact["pipeline"].predict_proba(source.reindex(columns=features))[:, 1]
+    order = np.argsort(-probabilities, kind="stable")
+    chunks = np.array_split(order, min(10, len(order)))
+    baseline = float(target.mean())
+    captured = 0
+    deciles = []
+    for index, chunk in enumerate(chunks):
+        if len(chunk) == 0:
+            continue
+        conversions = int(target.iloc[chunk].sum())
+        captured += conversions
+        rate = conversions / len(chunk)
+        deciles.append({
+            "decile": index + 1,
+            "rows": int(len(chunk)),
+            "conversions": conversions,
+            "subscription_rate": float(rate),
+            "lift_vs_baseline": float(rate / baseline) if baseline > 0 else None,
+            "cumulative_conversion_capture": float(captured / max(int(target.sum()), 1)),
+        })
+    return {
+        "dataset_id": dataset_id,
+        "model": artifact.get("selected_model", "unknown"),
+        "rows": int(len(frame)),
+        "baseline_subscription_rate": baseline,
+        "top_decile_subscription_rate": deciles[0]["subscription_rate"] if deciles else None,
+        "top_decile_lift": deciles[0]["lift_vs_baseline"] if deciles else None,
+        "deciles": deciles,
+        "note": "This is retrospective ranking lift on the supplied labelled dataset, not a causal campaign experiment or a guaranteed uplift estimate.",
+    }
+
+
 @app.post("/workflow/{dataset_id}/train")
 def train_sandbox_models(dataset_id: str, request: SandboxTrainingRequest) -> dict[str, Any]:
     """Train temporary binary classifiers on an upload without replacing the production model."""
