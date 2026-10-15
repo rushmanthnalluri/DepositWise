@@ -7,12 +7,17 @@ import zipfile
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+from uuid import uuid4
 
 import joblib
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from ml.train import build_pipeline, choose_f1_threshold, evaluate
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT / "frontend"
@@ -21,11 +26,23 @@ REPORT_PATH = ROOT / "reports/generated/model_comparison.json"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_CACHED_DATASETS = 8
 DATASET_CACHE: dict[str, pd.DataFrame] = {}
+SANDBOX_MODELS: dict[str, dict[str, Any]] = {}
 app = FastAPI(title="DepositWise API", description="Term-deposit subscription propensity prediction for educational use.", version="0.3.0")
 
 
 class PredictionRequest(BaseModel):
     customer: dict[str, Any] = Field(..., description="Dataset feature names and values, excluding target y and post-call duration.")
+
+
+class SandboxTrainingRequest(BaseModel):
+    target: str = Field(..., min_length=1, max_length=128)
+    models: list[str] = Field(default_factory=lambda: ["logistic_regression", "random_forest", "extra_trees"])
+    row_limit: int = Field(default=20000, ge=100, le=20000)
+
+
+class SandboxPredictionRequest(BaseModel):
+    run_id: str = Field(..., min_length=1, max_length=64)
+    customer: dict[str, Any]
 
 
 @app.get("/health")
@@ -213,6 +230,100 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
                 correlations.append({"feature_a": str(column), "feature_b": str(other), "correlation": float(corr.loc[column, other])})
         correlations.sort(key=lambda item: abs(item["correlation"]), reverse=True)
     return {"dataset_id": dataset_id, "target_distribution": target, "top_numeric_correlations": correlations[:30]}
+
+
+
+@app.post("/workflow/{dataset_id}/train")
+def train_sandbox_models(dataset_id: str, request: SandboxTrainingRequest) -> dict[str, Any]:
+    """Train temporary binary classifiers on an upload without replacing the production model."""
+    frame = _get_uploaded_dataset(dataset_id).copy(deep=True)
+    if request.target not in frame.columns:
+        raise HTTPException(status_code=422, detail="The selected target column does not exist in this dataset.")
+    frame = frame.dropna(subset=[request.target])
+    if len(frame) > request.row_limit:
+        raise HTTPException(status_code=413, detail=f"Sandbox training is limited to {request.row_limit:,} rows. Upload a smaller sample.")
+    labels = frame[request.target].astype(str)
+    classes = sorted(labels.unique().tolist())
+    if len(classes) != 2:
+        raise HTTPException(status_code=422, detail="Sandbox training currently supports binary classification targets only.")
+    if int(labels.value_counts().min()) < 10:
+        raise HTTPException(status_code=422, detail="Each target class needs at least 10 rows for a reliable split.")
+    X = frame.drop(columns=[request.target]).drop(columns=["duration"], errors="ignore")
+    X = X.drop(columns=[column for column in X.columns if X[column].isna().all()])
+    if X.empty:
+        raise HTTPException(status_code=422, detail="No usable feature columns remain after excluding the target and empty fields.")
+    if len(X.columns) > 100:
+        raise HTTPException(status_code=422, detail="Sandbox training is limited to 100 feature columns.")
+    y = labels.map({classes[0]: 0, classes[1]: 1}).astype(int)
+    try:
+        X_train_val, X_test, y_train_val, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        X_train, X_val, y_train, y_val = train_test_split(X_train_val, y_train_val, test_size=0.25, random_state=43, stratify=y_train_val)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="This dataset is too small or imbalanced for stratified splits.") from exc
+    candidates = {
+        "logistic_regression": LogisticRegression(max_iter=1200, class_weight="balanced", random_state=42),
+        "random_forest": RandomForestClassifier(n_estimators=60, min_samples_leaf=2, class_weight="balanced_subsample", n_jobs=1, random_state=42),
+        "extra_trees": ExtraTreesClassifier(n_estimators=60, min_samples_leaf=2, class_weight="balanced", n_jobs=1, random_state=42),
+    }
+    selected_names = list(dict.fromkeys(request.models))
+    if not selected_names or any(name not in candidates for name in selected_names):
+        raise HTTPException(status_code=422, detail="Choose supported models: logistic_regression, random_forest, extra_trees.")
+    comparison = []
+    validation_probabilities = {}
+    for name in selected_names:
+        try:
+            pipeline = build_pipeline(X_train, candidates[name])
+            pipeline.fit(X_train, y_train)
+            probabilities = pipeline.predict_proba(X_val)[:, 1]
+            result = evaluate(y_val, probabilities, threshold=0.5)
+            comparison.append({"model": name, **result})
+            validation_probabilities[name] = probabilities
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Could not train {name}; inspect missing values and column types.") from exc
+    champion = max(comparison, key=lambda result: result["average_precision"])
+    champion_name = champion["model"]
+    threshold, validation_f1 = choose_f1_threshold(y_val, validation_probabilities[champion_name])
+    final_pipeline = build_pipeline(X_train_val, candidates[champion_name])
+    final_pipeline.fit(X_train_val, y_train_val)
+    test_probabilities = final_pipeline.predict_proba(X_test)[:, 1]
+    baseline_metrics = evaluate(y_test, test_probabilities, threshold=0.5)
+    tuned_metrics = evaluate(y_test, test_probabilities, threshold=threshold)
+    run_id = uuid4().hex
+    if len(SANDBOX_MODELS) >= MAX_CACHED_DATASETS:
+        SANDBOX_MODELS.pop(next(iter(SANDBOX_MODELS)))
+    SANDBOX_MODELS[run_id] = {"pipeline": final_pipeline, "features": list(X.columns), "threshold": float(threshold), "selected_model": champion_name}
+    return {
+        "dataset_id": dataset_id,
+        "run_id": run_id,
+        "sandbox_only": True,
+        "rows": int(len(frame)),
+        "feature_count": int(len(X.columns)),
+        "target": request.target,
+        "target_classes": classes,
+        "selected_model": champion_name,
+        "selection_metric": "validation average_precision",
+        "validation_model_comparison": comparison,
+        "threshold_selection": {"method": "maximize F1 on validation split", "threshold": float(threshold), "validation_f1_at_selected_threshold": float(validation_f1)},
+        "final_test_metrics_at_0_5": baseline_metrics,
+        "final_test_metrics": tuned_metrics,
+        "excluded_features": ["duration"] if "duration" in frame.columns else [],
+        "limitations": ["Sandbox artifacts are held in process memory only.", "This exploratory run uses a random split; temporal and subgroup validation are not included.", "The sandbox run never replaces the deployed production model."],
+    }
+
+
+@app.post("/workflow/{dataset_id}/predict")
+def predict_sandbox_model(dataset_id: str, request: SandboxPredictionRequest) -> dict[str, Any]:
+    _get_uploaded_dataset(dataset_id)
+    artifact = SANDBOX_MODELS.get(request.run_id)
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Sandbox model run is missing or was evicted. Train the model again.")
+    try:
+        row = pd.DataFrame([request.customer]).reindex(columns=artifact["features"])
+        probability = float(artifact["pipeline"].predict_proba(row)[0, 1])
+        threshold = float(artifact["threshold"])
+        return {"run_id": request.run_id, "selected_model": artifact["selected_model"], "subscription_probability": probability, "threshold": threshold, "predicted_positive": bool(probability >= threshold), "sandbox_only": True}
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not score this sandbox profile: {exc}") from exc
 
 
 @app.post("/predict")
