@@ -40,6 +40,7 @@ PREDICTION_LATENCIES = deque(maxlen=500)
 LAST_PREDICTION_AT: str | None = None
 DATASET_CACHE: dict[str, pd.DataFrame] = {}
 SANDBOX_MODELS: dict[str, dict[str, Any]] = {}
+SANDBOX_RUN_HISTORY = deque(maxlen=25)
 app = FastAPI(title="DepositWise API", description="Term-deposit subscription propensity prediction for educational use.", version="0.3.0")
 
 
@@ -338,6 +339,13 @@ def build_sandbox_pipeline(X: pd.DataFrame, classifier, numeric_imputation: str,
 
 
 
+
+@app.get("/experiments")
+def experiments() -> dict[str, Any]:
+    """Return recent in-memory sandbox experiment summaries."""
+    return {"runs": list(SANDBOX_RUN_HISTORY), "persistent": False, "limit": 25}
+
+
 @app.post("/workflow/{dataset_id}/score-batch")
 def score_uploaded_batch(dataset_id: str, threshold: float | None = Query(default=None, ge=0.0, le=1.0)) -> StreamingResponse:
     """Score up to 20,000 uploaded rows with the production model and return a CSV download."""
@@ -440,6 +448,19 @@ def train_sandbox_models(dataset_id: str, request: SandboxTrainingRequest) -> di
     if len(SANDBOX_MODELS) >= MAX_CACHED_DATASETS:
         SANDBOX_MODELS.pop(next(iter(SANDBOX_MODELS)))
     SANDBOX_MODELS[run_id] = {"pipeline": final_pipeline, "features": list(X.columns), "threshold": float(threshold), "selected_model": champion_name}
+    SANDBOX_RUN_HISTORY.append({
+        "run_id": run_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "target": request.target,
+        "selected_model": champion_name,
+        "rows": int(len(frame)),
+        "feature_count": int(len(X.columns)),
+        "validation_average_precision": float(champion["average_precision"]),
+        "test_roc_auc": float(tuned_metrics["roc_auc"]),
+        "test_f1": float(tuned_metrics["f1"]),
+        "threshold": float(threshold),
+        "preprocessing_config": {"numeric_imputation": request.numeric_imputation, "categorical_imputation": request.categorical_imputation, "scale_numeric": request.scale_numeric},
+    })
     return {
         "dataset_id": dataset_id,
         "run_id": run_id,
