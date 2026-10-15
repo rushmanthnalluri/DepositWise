@@ -174,9 +174,11 @@ tests/             API and ML tests
 - Nine-stage guided ML workbench navigation, linked to the relevant workspace views.
 - Live dashboard metrics and feature importance are loaded from the generated model report rather than hardcoded in the interface.
 - CSV/XLSX upload profiling runs in memory and reports dimensions, column types, missing cells, duplicate rows, unique counts, and a sample preview.
-- Uploaded files are not persisted, do not replace the bundled dataset, and do not trigger model retraining.
+- Uploaded files are kept in a bounded in-memory cache only; they do not replace the bundled dataset or production model. Temporary profiles can be evicted when the cache is full or the service restarts.
 - Customer scoring calls the deployed model API and displays the estimated probability, selected threshold, and classification.
-- Model evaluation shows held-out metrics, validation-threshold context, candidate comparison where present, and top encoded feature importance.
+- Model evaluation shows held-out metrics, validation-threshold context, candidate comparison where present, top encoded feature importance, a calibration curve, and a confusion matrix.
+- Uploaded datasets can run feature inventory, descriptive statistics, missing-value analysis, numeric correlation summaries, and target-distribution analysis.
+- Binary-classification sandbox training can compare Logistic Regression, Random Forest, and Extra Trees; select a champion using validation average precision; tune its threshold on validation data; report held-out test metrics; and score an edited JSON customer profile. Sandbox models stay in memory and never replace the deployed champion.
 - Model-health page distinguishes actual API/model availability from monitoring capabilities that are not yet wired up.
 - Keyboard focus states, responsive layouts, reduced-motion support, upload-size/type checks, and API error states are included.
 
@@ -184,7 +186,7 @@ tests/             API and ML tests
 
 The interface and core interaction patterns are being adapted from [PropPulse](https://github.com/rushmanthnalluri/prop-pulse) and [PlacementPredict](https://github.com/rushmanthnalluri/placement-predict), with banking-specific equivalents instead of property valuation or student salary functionality.
 
-**Not yet implemented:** isolated sandbox model training, configurable preprocessing policies, persistent experiment tracking/model registry, per-customer SHAP explanations, campaign lift and cost optimization, prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The guided stages currently provide navigation and guidance; they are not all full training workflows yet.
+**Not yet implemented:** configurable preprocessing policies, persistent experiment tracking/model registry, per-prediction SHAP explanations, campaign lift and cost optimization, prediction logging, PSI drift monitoring, subgroup fairness reports, and temporal validation. The guided workbench now connects upload, profiling, EDA, sandbox training, evaluation, and sandbox scoring; preprocessing configuration and persistent run management remain future work.
 
 ## Roadmap
 
@@ -202,4 +204,4 @@ The interface and core interaction patterns are being adapted from [PropPulse](h
 
 ## Status
 
-The current branch contains the dashboard redesign, connected report-backed overview/evaluation views, customer scoring UI, and an in-memory CSV/XLSX data profiler with tests. This does **not** mean full feature parity is complete. No uploaded dataset is persisted or used to retrain the deployed model. Verify the latest CI run and Render deployment before claiming the new revision is live.
+The current branch contains the dashboard redesign, report-backed overview/evaluation views, customer scoring, in-memory CSV/XLSX profiling and EDA endpoints, sandbox binary-classifier training/scoring, and corresponding tests. This does **not** mean full feature parity is complete. No uploaded dataset is persisted or used to retrain the deployed model. Verify the latest CI run and Render deployment before claiming the new revision is live.
