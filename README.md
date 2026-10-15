@@ -192,7 +192,7 @@ The interface and core interaction patterns are being adapted from [PropPulse](h
 
 1. Add schema templates, richer dataset-specific validation, and persistent experiment/run history.
 2. Add SHAP-based local explanations and campaign lift/cost scenarios.
-3. Implement privacy-aware feature-drift monitoring and human-approved retraining recommendations.
+3. Extend drift monitoring to categorical features and persistent operational logs, with human-approved retraining recommendations.
 4. Add subgroup/fairness evaluation and temporal validation for future campaigns.
 
 ## References
