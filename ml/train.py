@@ -5,6 +5,7 @@ this same 45,211-row bank-full.csv dataset. Set DEPOSITWISE_DATA_PATH to overrid
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import tempfile
@@ -45,12 +46,24 @@ def ensure_dataset(path: Path) -> None:
             request = urllib.request.Request(UCI_ARCHIVE_URL, headers={"User-Agent": "DepositWise/1.0 educational project"})
             with urllib.request.urlopen(request, timeout=45) as response, archive_path.open("wb") as output:
                 output.write(response.read())
+            csv_bytes = None
             with zipfile.ZipFile(archive_path) as archive:
-                member = next((name for name in archive.namelist() if name.endswith("/bank-full.csv") or name == "bank-full.csv"), None)
-                if member is None:
-                    raise ValueError("The UCI archive did not contain bank-full.csv.")
-                with archive.open(member) as source, path.open("wb") as output:
-                    output.write(source.read())
+                # UCI's top-level archive currently contains nested bank.zip and
+                # bank-additional.zip files rather than loose CSV files.
+                direct_member = next((name for name in archive.namelist() if name.endswith("/bank-full.csv") or name == "bank-full.csv"), None)
+                if direct_member is not None:
+                    csv_bytes = archive.read(direct_member)
+                else:
+                    nested_archives = [name for name in archive.namelist() if name.lower().endswith(".zip")]
+                    for nested_name in nested_archives:
+                        with zipfile.ZipFile(io.BytesIO(archive.read(nested_name))) as nested:
+                            member = next((name for name in nested.namelist() if name.endswith("/bank-full.csv") or name == "bank-full.csv"), None)
+                            if member is not None:
+                                csv_bytes = nested.read(member)
+                                break
+            if csv_bytes is None:
+                raise ValueError("The UCI archive and its nested ZIP files did not contain bank-full.csv.")
+            path.write_bytes(csv_bytes)
     except Exception as exc:
         path.unlink(missing_ok=True)
         raise RuntimeError(f"Could not obtain dataset from the official UCI archive: {exc}. Download bank-full.csv manually and set DEPOSITWISE_DATA_PATH.") from exc
