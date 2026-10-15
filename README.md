@@ -22,16 +22,24 @@ The free Render service may sleep when idle. The Docker build downloads the publ
 ## Current capabilities
 
 - CSV loading, delimiter detection, and target validation.
-- EDA profile output with class balance, duplicates, missing-value counts, and a target-distribution chart.
+- Interactive EDA for uploads: feature inventory, descriptive statistics, missingness and duplicates, numeric/categorical distributions, target balance, numeric-feature summaries by outcome, segment subscription rates, and a numeric correlation heatmap.
 - Leakage-aware preprocessing for numeric and categorical features.
-- Comparison of Logistic Regression, Random Forest, and Extra Trees.
+- Four-model benchmarking: Logistic Regression, Random Forest, Extra Trees, and Gradient Boosting; users can select a candidate for live scoring, and sandbox runs can benchmark a chosen subset.
 - Model selection by validation average precision, with ROC-AUC, precision, recall, F1, balanced accuracy, Brier score, and confusion matrix reporting.
 - Decision-threshold tuning by validation F1, with the untouched test set evaluated at both the baseline and tuned thresholds.
 - Test-set calibration curve and model-based encoded-feature importance, exposed through `/model-info`.
-- FastAPI health and prediction endpoints.
+- FastAPI health, prediction, batch-scoring, model-info, and workflow endpoints; live scoring supports a model picker and validation-tuned per-model thresholds.
+- Twelve-stage guided ML workbench, selectable sandbox candidates, configurable preprocessing, isolated sandbox prediction, recent in-memory experiment history, and downloadable batch-scoring CSV.
+- Numeric and categorical PSI drift summaries, privacy-minimized JSONL prediction events, and illustrative campaign expected-net/break-even what-if calculations.
 - Responsive browser workbench served at `/dashboard`, connected to the prediction API.
 - Automated tests and a GitHub Actions workflow for Python 3.11 and 3.12.
 - Dockerfile for API and dashboard containerization.
+
+## Feature-parity status
+
+DepositWise adapts the shared ML-workbench pattern from PropPulse and Placement Predict to bank marketing. It now includes a twelve-stage guided workflow, richer EDA, four candidate classifiers, selectable scoring, batch scoring, threshold tuning, calibration, segment-level analysis, model health, and campaign-economics what-if controls. Banking-specific outputs replace property maps/comparable sales and student salary forecasts.
+
+**Remaining parity work:** true per-prediction SHAP explanations (current local explanations are single-feature baseline sensitivity), durable experiment tracking/registry (history is in memory; MLflow is not integrated), durable upload/session storage, campaign trend/segment lift reporting, full fairness/subgroup evaluation, temporal validation, and browser end-to-end tests. The prediction log and drift counters may reset on a restart because the current Render service does not use a persistent disk. These gaps are not represented as complete.
 
 ## Important modeling safeguards
 
