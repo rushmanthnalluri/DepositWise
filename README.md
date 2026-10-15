@@ -14,6 +14,7 @@ Do not commit downloaded data, customer records, credentials, model artifacts, o
 
 - **Dashboard:** https://depositwise.onrender.com/dashboard
 - **API health:** https://depositwise.onrender.com/health
+- **Model evaluation report:** https://depositwise.onrender.com/model-info
 - **Interactive API docs:** https://depositwise.onrender.com/docs
 
 The free Render service may sleep when idle. The Docker build downloads the public upstream dataset, generates the EDA profile, compares candidate models, and packages the selected model artifact into the image. The first deploy after a code change may take longer while model training runs.
@@ -101,6 +102,7 @@ uvicorn backend.app.main:app --reload
 ```
 
 - Health: http://127.0.0.1:8000/health
+- Model comparison and held-out test metrics: http://127.0.0.1:8000/model-info
 - Interactive API docs: http://127.0.0.1:8000/docs
 
 Example request body for `POST /predict` (use feature names from the dataset):
