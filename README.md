@@ -6,7 +6,7 @@ It borrows engineering ideas from [PropPulse](https://github.com/rushmanthnallur
 
 ## Dataset
 
-Use the [Kaggle Banking Dataset — Marketing Targets](https://www.kaggle.com/datasets/prakharrathi25/banking-dataset-marketing-targets). Download the labeled `bank-full.csv` file and put it at `data/raw/bank-full.csv`. The loader auto-detects common comma- and semicolon-delimited CSV files and expects the target column `y` with `yes`/`no` labels.
+Primary reference: [Kaggle Banking Dataset — Marketing Targets](https://www.kaggle.com/datasets/prakharrathi25/banking-dataset-marketing-targets). If `data/raw/bank-full.csv` is not present, the training and EDA scripts automatically download the corresponding upstream `bank-full.csv` from the [UCI Bank Marketing dataset](https://archive.ics.uci.edu/dataset/222/bank+marketing). You can still provide the Kaggle CSV locally; set `DEPOSITWISE_DATA_PATH` to override the default path. The loader detects comma- and semicolon-delimited files and validates the `y` target (`yes`/`no`).
 
 Do not commit downloaded data, customer records, credentials, model artifacts, or generated reports. Check the dataset's terms before redistributing it.
 
@@ -16,7 +16,7 @@ Do not commit downloaded data, customer records, credentials, model artifacts, o
 - **API health:** https://depositwise.onrender.com/health
 - **Interactive API docs:** https://depositwise.onrender.com/docs
 
-The free Render service may sleep when idle. The dashboard can load without a trained model, but prediction requests remain unavailable until the model artifact is trained and supplied.
+The free Render service may sleep when idle. The Docker build downloads the public upstream dataset, generates the EDA profile, compares candidate models, and packages the selected model artifact into the image. The first deploy after a code change may take longer while model training runs.
 
 ## Current capabilities
 
@@ -34,7 +34,7 @@ The free Render service may sleep when idle. The dashboard can load without a tr
 
 - `duration` is excluded because call duration is only known after contact. The model is intended for pre-call targeting.
 - Preprocessing is fitted within each model pipeline, after the train/validation split.
-- The current comparison uses one stratified validation split. It is for model selection, **not** an independent final test result.
+- The dataset is split into training, validation, and a separate test set. Candidate selection uses validation average precision; the selected model is then refit on train+validation and evaluated once on the held-out test set.
 - The default probability threshold of 0.5 is a baseline. Choose a threshold against an explicit campaign cost/benefit objective before deployment.
 - Model outputs are estimates, not guarantees. Review privacy, consent, fairness, and applicable marketing/banking requirements before real-world use.
 
@@ -69,14 +69,14 @@ pip install -r requirements.txt
 
 ## Run EDA and training
 
-Place the labeled CSV at `data/raw/bank-full.csv`, then run:
+If you have the Kaggle CSV, you can place it at `data/raw/bank-full.csv`. Otherwise the script downloads the upstream UCI dataset automatically. Then run:
 
 ```bash
 python -m ml.eda
 python -m ml.train
 ```
 
-EDA outputs are written to `reports/generated/data_profile.json` and `reports/figures/target_distribution.png`. Model comparison results are written to `reports/generated/model_comparison.json`. The selected pipeline is saved to `models/depositwise_model.joblib`. These generated files are intentionally ignored by Git.
+EDA outputs are written to `reports/generated/data_profile.json` and `reports/figures/target_distribution.png`. Model comparison, validation results, and held-out test metrics are written to `reports/generated/model_comparison.json`. The selected pipeline is saved to `models/depositwise_model.joblib`. These generated files are intentionally ignored by Git.
 
 To use another dataset path:
 
@@ -141,14 +141,14 @@ GitHub Actions runs the test suite on pushes to `main`, pull requests, and manua
 
 ## Docker
 
-Build the API image after training the model locally:
+Build the image (the Docker build downloads the dataset, generates EDA outputs, and trains the model):
 
 ```bash
 docker build -t depositwise .
 docker run --rm -p 8000:8000 -v "$(pwd)/models:/app/models:ro" depositwise
 ```
 
-On Windows PowerShell, replace the volume argument with `-v "${PWD}/models:/app/models:ro"`. The model artifact is not baked into the image. The mounted `models/depositwise_model.joblib` must exist, or the API will report that prediction is unavailable.
+On Windows PowerShell, replace the volume argument with `-v "${PWD}/models:/app/models:ro"`. The selected model artifact is baked into the image at build time, so the container can serve predictions immediately after a successful build. Rebuild the image to retrain on an updated dataset or pipeline.
 
 ## Repository structure
 
@@ -166,9 +166,9 @@ tests/             API and ML tests
 
 ## Roadmap
 
-- Add an untouched test set and threshold selection based on campaign economics.
+- Add threshold selection based on campaign economics.
 - Add confusion matrix, calibration checks, feature explanations, and drift monitoring.
-- Persist a trained model artifact in deployment so live predictions can run.
+- Add temporal validation to test generalization to future campaigns.
 
 ## References
 
@@ -178,4 +178,4 @@ tests/             API and ML tests
 
 ## Status
 
-The API, browser workbench, model-training scaffold, Docker configuration, and CI are committed. The test suite has passed in GitHub Actions for Python 3.11 and 3.12. The Kaggle CSV has not been added and no trained model artifact is committed; prediction requests return a clear unavailable response until a model is trained and supplied. The API and dashboard are live on Render. Prediction inference is not yet active because the Kaggle dataset has not been supplied and a trained model artifact has not been generated.
+The API, browser workbench, auto-downloadable dataset pipeline, EDA script, three-model comparison, held-out test evaluation, Docker build-time training, and CI are committed. No CSV or model artifact is stored in Git. CI results and the latest Render deploy should be checked before claiming the current deployment is healthy; model metrics should be read from the generated evaluation report rather than assumed.
