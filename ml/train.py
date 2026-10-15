@@ -207,7 +207,20 @@ def main() -> None:
     }
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"pipeline": final_pipeline, "features": list(X.columns), "selected_model": best["model"], "threshold": validation_threshold}, MODEL_PATH)
+    baseline_customer = {}
+    for column in X.columns:
+        if column in X_train_val.select_dtypes(include="number").columns:
+            baseline_customer[column] = float(X_train_val[column].median())
+        else:
+            modes = X_train_val[column].dropna().mode()
+            baseline_customer[column] = modes.iloc[0] if not modes.empty else "unknown"
+    joblib.dump({
+        "pipeline": final_pipeline,
+        "features": list(X.columns),
+        "selected_model": best["model"],
+        "threshold": validation_threshold,
+        "baseline_customer": baseline_customer,
+    }, MODEL_PATH)
     REPORT_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
     print(f"Selected model saved: {MODEL_PATH}")
