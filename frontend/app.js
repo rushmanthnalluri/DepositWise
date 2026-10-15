@@ -94,7 +94,7 @@ async function loadHealth(){
    if(metricsResponse.ok){
     const metrics=await metricsResponse.json();
     $("#health-prediction-count").textContent=Number(metrics.prediction_count||0).toLocaleString();
-    $("#health-checks").innerHTML += [["Recent prediction samples",String(metrics.recent_sample_count)],["Mean inference latency",metrics.mean_latency_ms==null?"No samples":fmt(metrics.mean_latency_ms,2)+" ms"],["Last successful prediction",metrics.last_prediction_at||"No predictions yet"],["Feature drift monitoring",metrics.drift_monitoring==="not_configured"?"Not configured":"Available"]].map(([a,b])=>'<div class="check-row"><span>'+esc(a)+'</span><span class="check-state '+(b==="Not configured"?"warn":"")+'">'+esc(b)+'</span></div>').join("");
+    $("#health-checks").innerHTML += [["Recent prediction samples",String(metrics.recent_sample_count)],["Mean inference latency",metrics.mean_latency_ms==null?"No samples":fmt(metrics.mean_latency_ms,2)+" ms"],["Last successful prediction",metrics.last_prediction_at||"No predictions yet"],["Feature drift monitoring",metrics.drift_monitoring==="not_configured"?"Not configured":"Numeric PSI"],["Numeric PSI status",metrics.drift_status||"Insufficient data"],["Features above warning threshold",(metrics.drift_features||[]).filter(x=>x.psi>=0.1).map(x=>x.feature+" ("+fmt(x.psi,2)+")").join(", ")||"None"]].map(([a,b])=>'<div class="check-row"><span>'+esc(a)+'</span><span class="check-state '+(b==="Not configured"?"warn":"")+'">'+esc(b)+'</span></div>').join("");
    }
   }catch(_){}
 
