@@ -18,8 +18,9 @@ Do not commit downloaded data, customer records, credentials, model artifacts, o
 - Comparison of Logistic Regression, Random Forest, and Extra Trees.
 - Model selection by validation average precision, with ROC-AUC, precision, recall, and F1 reported for each candidate.
 - FastAPI health and prediction endpoints.
+- Responsive browser workbench served at `/dashboard`, connected to the prediction API.
 - Automated tests and a GitHub Actions workflow for Python 3.11 and 3.12.
-- Dockerfile for API containerization.
+- Dockerfile for API and dashboard containerization.
 
 ## Important modeling safeguards
 
@@ -159,8 +160,9 @@ tests/             API and ML tests
 
 - Add a separate untouched test set and threshold selection based on campaign economics.
 - Add confusion matrix, calibration checks, feature explanations, and drift monitoring.
-- Build a responsive browser dashboard and connect it to the API.
-- Deploy the API and dashboard after model artifact storage and environment configuration are decided.
+- Add an untouched test set and threshold selection based on campaign economics.
+- Add confusion matrix, calibration checks, feature explanations, and drift monitoring.
+- Persist a trained model artifact in deployment so live predictions can run.
 
 ## References
 
@@ -170,4 +172,4 @@ tests/             API and ML tests
 
 ## Status
 
-The starter implementation and CI configuration are committed. The dataset has not been added, and model training, deployment, and passing CI status must not be claimed until verified from actual runs.
+The API, browser workbench, model-training scaffold, Docker configuration, and CI are committed. The test suite has passed in GitHub Actions for Python 3.11 and 3.12. The Kaggle CSV has not been added and no trained model artifact is committed; prediction requests return a clear unavailable response until a model is trained and supplied. A Render service has been configured for deployment.
