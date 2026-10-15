@@ -15,7 +15,7 @@ MODEL_PATH = Path(os.getenv("DEPOSITWISE_MODEL_PATH", ROOT / "models/depositwise
 app = FastAPI(title="DepositWise API", description="Term-deposit subscription propensity prediction for educational use.", version="0.2.0")
 
 class PredictionRequest(BaseModel):
-    customer: dict[str, Any] = Field(..., description="Feature names and values from the dataset, excluding target y and post-call duration.")
+    customer: dict[str, Any] = Field(..., description="Dataset feature names and values, excluding target y and post-call duration.")
 
 @app.get("/health")
 def health() -> dict[str, str | bool]:
@@ -31,7 +31,8 @@ def dashboard() -> HTMLResponse:
     styles = (FRONTEND_DIR / "styles.css").read_text(encoding="utf-8")
     script = (FRONTEND_DIR / "app.js").read_text(encoding="utf-8")
     page = page.replace('<link rel="stylesheet" href="/static/styles.css">', f"<style>{styles}</style>")
-    page = page.replace('<script src="/static/app.js" defer></script>', f"<script>{script}</script>")
+    page = page.replace('<script src="/static/app.js" defer></script>', "")
+    page = page.replace("</body>", f"<script>{script}</script></body>")
     return HTMLResponse(content=page)
 
 @app.post("/predict")
