@@ -100,6 +100,15 @@ async function loadHealth(){
 
  }catch(e){$("#api-status").textContent="API connection unavailable";$("#sidebar-health").textContent="API unavailable";$("#sidebar-status").classList.remove("online");$("#health-api").textContent="Unavailable";}
 }
+
+async function loadExperiments(){
+ try{
+  const response=await fetch("/experiments",{cache:"no-store"});if(!response.ok)throw new Error("Run history unavailable");
+  const data=await response.json();
+  $("#experiment-table").innerHTML=(data.runs||[]).slice().reverse().map(run=>'<tr><td>'+esc(new Date(run.created_at).toLocaleString())+'</td><td>'+esc(run.target)+'</td><td>'+esc(run.selected_model)+'</td><td>'+Number(run.rows).toLocaleString()+'</td><td>'+fmt(run.validation_average_precision,3)+'</td><td>'+fmt(run.test_f1,3)+'</td></tr>').join("")||'<tr><td colspan="6">No sandbox runs in this process yet.</td></tr>';
+ }catch(_){$("#experiment-table").innerHTML='<tr><td colspan="6">Experiment history unavailable.</td></tr>';}
+}
+
 async function loadReport(){
  try{const res=await fetch("/model-info",{cache:"no-store"});if(!res.ok)throw new Error("Report unavailable");const data=await res.json();renderReport(data);$("#health-report").textContent="Available";}
  catch(e){$("#health-report").textContent="Unavailable";$("#overview-metrics").innerHTML='<div class="empty-state">Model report unavailable. Check the deployment logs.</div>';$("#feature-list").innerHTML='<div class="empty-state">Feature report unavailable.</div>';}
@@ -180,7 +189,7 @@ async function trainSandboxDataset(){
  try{
   const res=await fetch("/workflow/"+encodeURIComponent(activeDatasetId)+"/train",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:activeTargetColumn,models:$$('input[name="sandbox-model"]:checked').map(input=>input.value),row_limit:20000,numeric_imputation:$("#sandbox-numeric-imputation").value,categorical_imputation:$("#sandbox-categorical-imputation").value,scale_numeric:$("#sandbox-scale-numeric").value==="true"})});
   const data=await res.json();if(!res.ok)throw new Error(data.detail||"Sandbox training failed.");
-  activeSandboxRunId=data.run_id;
+  activeSandboxRunId=data.run_id;loadExperiments();
   const rows=(data.validation_model_comparison||[]).map(m=>"<tr><td>"+esc(m.model)+"</td><td>"+fmt(m.average_precision,3)+"</td><td>"+fmt(m.roc_auc,3)+"</td><td>"+fmt(m.f1,3)+"</td><td class=\"table-status\">"+(m.model===data.selected_model?"CHAMPION":"CANDIDATE")+"</td></tr>").join("");
   const example={...(activeSampleRow||{})};delete example[activeTargetColumn];
   output.innerHTML='<div class="panel" style="margin-top:16px"><div class="panel-header"><div><div class="eyebrow">SANDBOX RUN · NOT PRODUCTION</div><h2>Training results</h2></div><span class="pill pill-green">Completed</span></div><div class="profile-summary"><div class="profile-chip"><small>Champion</small><strong>'+esc(data.selected_model)+'</strong></div><div class="profile-chip"><small>Test ROC-AUC</small><strong>'+fmt(data.final_test_metrics.roc_auc,3)+'</strong></div><div class="profile-chip"><small>Test F1</small><strong>'+fmt(data.final_test_metrics.f1,3)+'</strong></div><div class="profile-chip"><small>Test precision</small><strong>'+pct(data.final_test_metrics.precision,1)+'</strong></div><div class="profile-chip"><small>Test recall</small><strong>'+pct(data.final_test_metrics.recall,1)+'</strong></div><div class="profile-chip"><small>Threshold</small><strong>'+pct(data.threshold_selection.threshold,0)+'</strong></div></div><div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Validation AP</th><th>Validation ROC-AUC</th><th>Validation F1</th><th>Selection</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="muted-copy">This run is held in memory and does not change the production model. Test metrics are shown after validation-based model and threshold selection.</p><div class="divider"></div><h3>Sandbox prediction input (JSON)</h3><p class="muted-copy">An example feature row is prefilled below. Edit it to represent a new customer profile, and remove any fields not available at decision time.</p><textarea id="sandbox-customer-json" rows="7" style="width:100%;background:#101310;color:#e9eee5;border:1px solid #343a34;border-radius:7px;padding:12px;font:11px \'DM Mono\',monospace">'+esc(JSON.stringify(example,null,2))+'</textarea><button class="button button-primary" id="sandbox-score-button" style="margin-top:12px">Score sandbox profile ↗</button><div id="sandbox-prediction-output"></div></div>';
@@ -225,4 +234,4 @@ async function loadProfileInsight(action){
   output.innerHTML='<div class="panel" style="margin-top:16px"><div class="panel-header"><div><div class="eyebrow">DATASET ANALYSIS</div><h2>'+title+'</h2></div><span class="pill pill-green">Computed live</span></div>'+body+'</div>';
  }catch(error){output.innerHTML='<div class="error-message">'+esc(error.message)+'</div>';}
 }
-renderStage();loadHealth();loadReport();
+renderStage();loadHealth();loadReport();loadExperiments();
