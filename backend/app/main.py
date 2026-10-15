@@ -56,6 +56,7 @@ def model_info() -> dict[str, Any]:
             "selected_model": report.get("selected_model"),
             "rows": report.get("rows"),
             "positive_rate": report.get("positive_rate"),
+            "positive_rate_full_dataset": report.get("positive_rate_full_dataset"),
             "selection_metric": report.get("selection_metric"),
             "validation_model_comparison": report.get("validation_model_comparison", []),
             "threshold_selection": report.get("threshold_selection"),
