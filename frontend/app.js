@@ -156,6 +156,7 @@ $("#subscription-value").addEventListener("input",updateEconomics);
 $("#contact-cost").addEventListener("input",updateEconomics);
 
 function renderStage(){
+ $("[data-stage]").forEach(button=>button.classList.toggle("active",Number(button.dataset.stage)===currentStage+1));
  const s=stages[currentStage];$("#workflow-title").textContent=s.title;$("#workflow-description").textContent=s.desc;$("#workflow-stage").textContent="STAGE "+String(currentStage+1).padStart(2,"0")+" / 12";$("#workflow-progress-fill").style.width=((currentStage+1)/12*100)+"%";
  $("#workflow-content").innerHTML=`<div class="eyebrow">STAGE ${String(currentStage+1).padStart(2,"0")}</div><h2>${esc(s.title)}</h2><p>${esc(s.desc)}</p><ul>${s.bullets.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><button class="button button-secondary" id="stage-open-view">Open related workspace →</button>`;
  $("#stage-open-view").addEventListener("click",()=>showView(s.view,s.title));$("#workflow-prev").disabled=currentStage===0;$("#workflow-next").textContent=currentStage===11?"Back to overview →":"Next stage →";
