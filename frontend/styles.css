@@ -11,3 +11,5 @@
 
 .economics-panel{margin:18px 0;padding:14px;border:1px solid #40351e;background:#1b1913;border-radius:9px}.economics-panel h3{font-size:14px;margin:8px 0 14px}.economics-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.economics-grid label{display:flex;flex-direction:column;gap:7px;color:#aeb7ab;font-size:9px}.economics-grid input{min-width:0;width:100%;background:#101310;color:#e9eee5;border:1px solid #3c3b2d;border-radius:6px;padding:9px;font-size:10px}.economics-panel .detail-row strong.positive{color:#81c997}.economics-panel .detail-row strong.negative{color:#e19a8e}.economics-panel .muted-copy{font-size:9px;margin-bottom:0}
 @media(max-width:520px){.economics-grid{grid-template-columns:1fr}}
+
+.model-options{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:#111411;margin:12px 0}.model-options strong{font-size:10px;color:#c8d0c4;margin-right:4px}.model-options label{display:inline-flex;align-items:center;gap:6px;font-size:10px;color:#aeb7ab}.model-options input{accent-color:var(--amber)}
