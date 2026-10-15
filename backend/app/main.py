@@ -383,6 +383,29 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
         expected = artifact["features"]
         row = pd.DataFrame([request.customer]).reindex(columns=expected)
         probability = float(pipeline.predict_proba(row)[0, 1])
+        explanations = []
+        baseline_customer = artifact.get("baseline_customer")
+        if isinstance(baseline_customer, dict) and baseline_customer:
+            try:
+                baseline_row = pd.DataFrame([baseline_customer]).reindex(columns=expected)
+                baseline_probability = float(pipeline.predict_proba(baseline_row)[0, 1])
+                for feature in expected:
+                    candidate = dict(baseline_customer)
+                    candidate[feature] = request.customer.get(feature, baseline_customer.get(feature))
+                    candidate_row = pd.DataFrame([candidate]).reindex(columns=expected)
+                    candidate_probability = float(pipeline.predict_proba(candidate_row)[0, 1])
+                    impact = candidate_probability - baseline_probability
+                    explanations.append({
+                        "feature": feature,
+                        "impact_probability": impact,
+                        "direction": "higher" if impact > 0 else "lower" if impact < 0 else "neutral",
+                        "customer_value": request.customer.get(feature),
+                        "baseline_value": baseline_customer.get(feature),
+                    })
+                explanations.sort(key=lambda item: abs(item["impact_probability"]), reverse=True)
+                explanations = explanations[:5]
+            except Exception:
+                explanations = []
         threshold = float(artifact.get("threshold", 0.5))
         PREDICTION_COUNT += 1
         LAST_PREDICTION_AT = datetime.now(timezone.utc).isoformat()
@@ -392,6 +415,8 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
             "predicted_subscription": bool(probability >= threshold),
             "threshold": threshold,
             "selected_model": artifact.get("selected_model", "unknown"),
+            "top_feature_impacts": explanations,
+            "explanation_method": "single-feature baseline sensitivity; not causal and not SHAP",
             "note": "Educational estimate, not a guarantee. Validate model quality and tune the decision threshold before operational use.",
         }
     except Exception as exc:
