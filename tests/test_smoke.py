@@ -49,7 +49,7 @@ def test_model_info_is_explicit_when_report_is_missing():
 def test_dataset_profile_csv_is_in_memory_and_reports_quality():
     response = client.post(
         "/dataset/profile",
-        files={"file": ("campaign.csv", b"age,y\\n35,yes\\n42,no\\n,yes\\n", "text/csv")},
+        files={"file": ("campaign.csv", b"age,y\n35,yes\n42,no\n,yes\n", "text/csv")},
     )
     assert response.status_code == 200
     data = response.json()
