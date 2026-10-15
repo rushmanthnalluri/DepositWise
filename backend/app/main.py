@@ -6,6 +6,7 @@ import os
 import zipfile
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import joblib
 import pandas as pd
@@ -18,6 +19,8 @@ FRONTEND_DIR = ROOT / "frontend"
 MODEL_PATH = Path(os.getenv("DEPOSITWISE_MODEL_PATH", ROOT / "models/depositwise_model.joblib"))
 REPORT_PATH = ROOT / "reports/generated/model_comparison.json"
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_CACHED_DATASETS = 8
+DATASET_CACHE: dict[str, pd.DataFrame] = {}
 app = FastAPI(title="DepositWise API", description="Term-deposit subscription propensity prediction for educational use.", version="0.3.0")
 
 
@@ -107,6 +110,10 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="The file contains duplicate column names. Rename them before profiling.")
     if len(frame) > 250_000:
         raise HTTPException(status_code=422, detail="The file has more than 250,000 rows; sample it before profiling.")
+    if len(DATASET_CACHE) >= MAX_CACHED_DATASETS:
+        DATASET_CACHE.pop(next(iter(DATASET_CACHE)))
+    dataset_id = uuid4().hex
+    DATASET_CACHE[dataset_id] = frame.copy(deep=True)
     columns = []
     for name in frame.columns:
         series = frame[name]
@@ -128,6 +135,7 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         }
     return {
         "filename": filename,
+        "dataset_id": dataset_id,
         "rows": int(len(frame)),
         "column_count": int(len(frame.columns)),
         "missing_cells": int(frame.isna().sum().sum()),
@@ -140,6 +148,71 @@ async def profile_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "persisted": False,
         "training_triggered": False,
     }
+
+
+def _get_uploaded_dataset(dataset_id: str) -> pd.DataFrame:
+    frame = DATASET_CACHE.get(dataset_id)
+    if frame is None:
+        raise HTTPException(status_code=404, detail="This temporary dataset profile has expired or was evicted. Upload the file again.")
+    return frame
+
+
+@app.get("/workflow/{dataset_id}/features")
+def uploaded_feature_inventory(dataset_id: str) -> dict[str, Any]:
+    frame = _get_uploaded_dataset(dataset_id)
+    return {
+        "dataset_id": dataset_id,
+        "columns": [
+            {
+                "name": str(name),
+                "dtype": str(frame[name].dtype),
+                "role": "target candidate" if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"} else "feature",
+                "missing": int(frame[name].isna().sum()),
+                "unique": int(frame[name].nunique(dropna=True)),
+            }
+            for name in frame.columns
+        ],
+    }
+
+
+@app.get("/workflow/{dataset_id}/statistics")
+def uploaded_descriptive_statistics(dataset_id: str) -> dict[str, Any]:
+    frame = _get_uploaded_dataset(dataset_id)
+    numeric = frame.select_dtypes(include="number")
+    records = json.loads(numeric.describe().transpose().reset_index().rename(columns={"index": "column"}).to_json(orient="records"))
+    return {"dataset_id": dataset_id, "numeric_column_count": int(len(numeric.columns)), "statistics": records}
+
+
+@app.get("/workflow/{dataset_id}/missing")
+def uploaded_missing_values(dataset_id: str) -> dict[str, Any]:
+    frame = _get_uploaded_dataset(dataset_id)
+    total = max(1, len(frame))
+    missing = [
+        {"column": str(name), "missing": int(frame[name].isna().sum()), "missing_fraction": float(frame[name].isna().sum() / total)}
+        for name in frame.columns
+    ]
+    return {"dataset_id": dataset_id, "rows": int(len(frame)), "missing_cells": int(frame.isna().sum().sum()), "duplicate_rows": int(frame.duplicated().sum()), "columns": missing}
+
+
+@app.get("/workflow/{dataset_id}/visualization")
+def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
+    frame = _get_uploaded_dataset(dataset_id)
+    target_candidates = [name for name in frame.columns if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"}]
+    target = None
+    if target_candidates:
+        column = target_candidates[0]
+        counts = frame[column].fillna("<missing>").astype(str).value_counts(dropna=False)
+        target = {"column": str(column), "labels": [str(key) for key in counts.index], "counts": [int(value) for value in counts.values]}
+    numeric = frame.select_dtypes(include="number")
+    correlations = []
+    if len(numeric.columns) > 1:
+        corr = numeric.corr(numeric_only=True).fillna(0)
+        names = list(corr.columns)
+        for i, column in enumerate(names):
+            for other in names[i + 1:]:
+                correlations.append({"feature_a": str(column), "feature_b": str(other), "correlation": float(corr.loc[column, other])})
+        correlations.sort(key=lambda item: abs(item["correlation"]), reverse=True)
+    return {"dataset_id": dataset_id, "target_distribution": target, "top_numeric_correlations": correlations[:30]}
 
 
 @app.post("/predict")
