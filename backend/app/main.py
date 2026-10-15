@@ -93,6 +93,7 @@ def dashboard() -> HTMLResponse:
 
 MODEL_ARTIFACT_CACHE: dict[str, Any] | None = None
 MODEL_ARTIFACT_CACHE_KEY: tuple[str, int, int] | None = None
+SHAP_EXPLAINER_CACHE: dict[str, Any] = {}
 
 
 def load_model_artifact() -> dict[str, Any]:
@@ -103,6 +104,7 @@ def load_model_artifact() -> dict[str, Any]:
     if MODEL_ARTIFACT_CACHE is None or MODEL_ARTIFACT_CACHE_KEY != key:
         MODEL_ARTIFACT_CACHE = joblib.load(MODEL_PATH)
         MODEL_ARTIFACT_CACHE_KEY = key
+        SHAP_EXPLAINER_CACHE.clear()
     return MODEL_ARTIFACT_CACHE
 
 
@@ -709,21 +711,28 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
             background_transformed = preprocessor.transform(background_raw.reindex(columns=expected))
             row_transformed = preprocessor.transform(row)
             encoded_names = preprocessor.get_feature_names_out()
-            if hasattr(classifier, "feature_importances_"):
-                explainer = shap.TreeExplainer(
-                    classifier,
-                    data=background_transformed,
-                    feature_perturbation="interventional",
-                    model_output="probability",
-                )
-                shap_values = explainer.shap_values(row_transformed, check_additivity=False)
-                impact_unit = "probability"
-            elif hasattr(classifier, "coef_"):
-                explainer = shap.LinearExplainer(classifier, background_transformed)
-                shap_values = explainer.shap_values(row_transformed)
-                impact_unit = "log-odds"
+            explainer = SHAP_EXPLAINER_CACHE.get(selected_model)
+            if explainer is None:
+                if hasattr(classifier, "feature_importances_"):
+                    explainer = shap.TreeExplainer(
+                        classifier,
+                        data=background_transformed,
+                        feature_perturbation="interventional",
+                        model_output="probability",
+                    )
+                    impact_unit = "probability"
+                elif hasattr(classifier, "coef_"):
+                    explainer = shap.LinearExplainer(classifier, background_transformed)
+                    impact_unit = "log-odds"
+                else:
+                    raise ValueError("The selected estimator does not support the configured SHAP explainer.")
+                SHAP_EXPLAINER_CACHE[selected_model] = explainer
             else:
-                raise ValueError("The selected estimator does not support the configured SHAP explainer.")
+                impact_unit = "probability" if hasattr(classifier, "feature_importances_") else "log-odds"
+            if impact_unit == "probability":
+                shap_values = explainer.shap_values(row_transformed, check_additivity=False)
+            else:
+                shap_values = explainer.shap_values(row_transformed)
             if isinstance(shap_values, list):
                 shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
             values = np.asarray(shap_values, dtype=float)
