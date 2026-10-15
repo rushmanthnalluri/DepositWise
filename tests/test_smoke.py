@@ -94,3 +94,34 @@ def test_dataset_profile_rejects_empty_csv():
         files={"file": ("empty.csv", b"", "text/csv")},
     )
     assert response.status_code == 400
+
+
+def test_sandbox_training_and_prediction_do_not_touch_production_model():
+    rows = ["age,balance,y"]
+    for i in range(60):
+        label = "yes" if i % 2 else "no"
+        rows.append(f"{20 + i},{100 + i * 3},{label}")
+    upload = client.post(
+        "/dataset/profile",
+        files={"file": ("small-campaign.csv", ("\\n".join(rows) + "\\n").encode(), "text/csv")},
+    )
+    assert upload.status_code == 200
+    dataset_id = upload.json()["dataset_id"]
+
+    trained = client.post(
+        f"/workflow/{dataset_id}/train",
+        json={"target": "y", "models": ["logistic_regression"], "row_limit": 20000},
+    )
+    assert trained.status_code == 200
+    result = trained.json()
+    assert result["sandbox_only"] is True
+    assert result["selected_model"] == "logistic_regression"
+    assert "final_test_metrics" in result
+
+    prediction = client.post(
+        f"/workflow/{dataset_id}/predict",
+        json={"run_id": result["run_id"], "customer": {"age": 37, "balance": 611}},
+    )
+    assert prediction.status_code == 200
+    assert prediction.json()["sandbox_only"] is True
+    assert 0 <= prediction.json()["subscription_probability"] <= 1
