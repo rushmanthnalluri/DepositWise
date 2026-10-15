@@ -1,8 +1,4 @@
-"""Compare leakage-aware classifiers on the public UCI/Kaggle bank marketing data.
-
-If data/raw/bank-full.csv is absent, fetch the official UCI archive, which hosts
-this same 45,211-row bank-full.csv dataset. Set DEPOSITWISE_DATA_PATH to override.
-"""
+"""Compare leakage-aware classifiers and evaluate the selected model honestly."""
 from __future__ import annotations
 
 import io
@@ -14,12 +10,23 @@ import zipfile
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
+from sklearn.calibration import calibration_curve
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    average_precision_score,
+    balanced_accuracy_score,
+    brier_score_loss,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -48,14 +55,12 @@ def ensure_dataset(path: Path) -> None:
                 output.write(response.read())
             csv_bytes = None
             with zipfile.ZipFile(archive_path) as archive:
-                # UCI's top-level archive currently contains nested bank.zip and
-                # bank-additional.zip files rather than loose CSV files.
                 direct_member = next((name for name in archive.namelist() if name.endswith("/bank-full.csv") or name == "bank-full.csv"), None)
                 if direct_member is not None:
                     csv_bytes = archive.read(direct_member)
                 else:
-                    nested_archives = [name for name in archive.namelist() if name.lower().endswith(".zip")]
-                    for nested_name in nested_archives:
+                    # The official UCI archive nests bank-full.csv inside bank.zip.
+                    for nested_name in [name for name in archive.namelist() if name.lower().endswith(".zip")]:
                         with zipfile.ZipFile(io.BytesIO(archive.read(nested_name))) as nested:
                             member = next((name for name in nested.namelist() if name.endswith("/bank-full.csv") or name == "bank-full.csv"), None)
                             if member is not None:
@@ -96,16 +101,46 @@ def build_pipeline(X: pd.DataFrame, classifier) -> Pipeline:
     return Pipeline([("preprocess", prep), ("classifier", classifier)])
 
 
-def evaluate(y_true, probabilities) -> dict[str, float]:
-    predictions = (probabilities >= 0.5).astype(int)
+def evaluate(y_true, probabilities, threshold: float = 0.5) -> dict:
+    """Calculate ranking, classification, calibration and confusion-matrix metrics."""
+    predictions = (probabilities >= threshold).astype(int)
+    tn, fp, fn, tp = confusion_matrix(y_true, predictions, labels=[0, 1]).ravel()
     return {
-        "threshold": 0.5,
+        "threshold": float(threshold),
         "average_precision": float(average_precision_score(y_true, probabilities)),
         "roc_auc": float(roc_auc_score(y_true, probabilities)),
         "precision": float(precision_score(y_true, predictions, zero_division=0)),
         "recall": float(recall_score(y_true, predictions, zero_division=0)),
         "f1": float(f1_score(y_true, predictions, zero_division=0)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_true, predictions)),
+        "brier_score": float(brier_score_loss(y_true, probabilities)),
+        "confusion_matrix": {"true_negative": int(tn), "false_positive": int(fp), "false_negative": int(fn), "true_positive": int(tp)},
     }
+
+
+def choose_f1_threshold(y_true, probabilities) -> tuple[float, float]:
+    """Choose a decision threshold on validation data only, never on the test set."""
+    candidates = np.arange(0.10, 0.901, 0.01)
+    scores = [(float(f1_score(y_true, probabilities >= threshold, zero_division=0)), float(threshold)) for threshold in candidates]
+    best_f1, best_threshold = max(scores, key=lambda pair: (pair[0], pair[1]))
+    return best_threshold, best_f1
+
+
+def top_encoded_feature_importance(pipeline: Pipeline, limit: int = 15) -> list[dict[str, float | str]]:
+    """Return model-based importance for the top encoded features, when supported."""
+    preprocessor = pipeline.named_steps["preprocess"]
+    classifier = pipeline.named_steps["classifier"]
+    names = preprocessor.get_feature_names_out()
+    if hasattr(classifier, "feature_importances_"):
+        values = np.asarray(classifier.feature_importances_, dtype=float)
+        method = "tree impurity importance"
+    elif hasattr(classifier, "coef_"):
+        values = np.abs(np.asarray(classifier.coef_, dtype=float)).ravel()
+        method = "absolute logistic coefficient"
+    else:
+        return []
+    order = np.argsort(values)[::-1][:limit]
+    return [{"feature": str(names[index]), "importance": float(values[index]), "method": method} for index in order]
 
 
 def main() -> None:
@@ -122,21 +157,30 @@ def main() -> None:
         "extra_trees": ExtraTreesClassifier(n_estimators=150, min_samples_leaf=2, class_weight="balanced", n_jobs=-1, random_state=RANDOM_STATE),
     }
     comparison = []
+    fitted = {}
+    validation_probabilities = {}
     for name, classifier in candidates.items():
         pipeline = build_pipeline(X_train, classifier)
         pipeline.fit(X_train, y_train)
-        metrics = evaluate(y_val, pipeline.predict_proba(X_val)[:, 1])
+        probabilities = pipeline.predict_proba(X_val)[:, 1]
+        metrics = evaluate(y_val, probabilities, threshold=0.5)
         comparison.append({"model": name, **metrics})
+        fitted[name] = pipeline
+        validation_probabilities[name] = probabilities
         print(f"Validation {name}: average_precision={metrics['average_precision']:.4f}, ROC-AUC={metrics['roc_auc']:.4f}")
 
     best = max(comparison, key=lambda result: result["average_precision"])
-    # The test set did not influence model selection; score it only after refitting the winner.
+    validation_threshold, validation_best_f1 = choose_f1_threshold(y_val, validation_probabilities[best["model"]])
+    # The test set did not influence model or threshold selection.
     final_pipeline = build_pipeline(X_train_val, candidates[best["model"]])
     final_pipeline.fit(X_train_val, y_train_val)
-    test_metrics = evaluate(y_test, final_pipeline.predict_proba(X_test)[:, 1])
+    test_probabilities = final_pipeline.predict_proba(X_test)[:, 1]
+    test_metrics_baseline = evaluate(y_test, test_probabilities, threshold=0.5)
+    test_metrics_tuned = evaluate(y_test, test_probabilities, threshold=validation_threshold)
+    fraction_positive, mean_predicted = calibration_curve(y_test, test_probabilities, n_bins=10, strategy="quantile")
     report = {
         "project": "DepositWise",
-        "dataset_source": "UCI Machine Learning Repository, Bank Marketing (dataset 222), bank-full.csv; equivalent upstream dataset used by Kaggle copies",
+        "dataset_source": "UCI Machine Learning Repository, Bank Marketing (dataset 222), bank-full.csv; upstream variant used by Kaggle copies",
         "dataset_source_url": "https://archive.ics.uci.edu/dataset/222/bank+marketing",
         "rows": int(len(frame)),
         "feature_count_before_exclusions": int(frame.shape[1]),
@@ -150,13 +194,20 @@ def main() -> None:
         "positive_rate_test": float(y_test.mean()),
         "random_state": RANDOM_STATE,
         "validation_model_comparison": comparison,
-        "final_test_metrics": test_metrics,
-        "threshold_note": "0.5 is a baseline, not a threshold optimized for campaign costs or capacity.",
-        "limitations": ["One stratified random split; temporal validation may be more realistic for future campaigns.", "Assess calibration, subgroup performance, and campaign utility before operational decisions."],
+        "threshold_selection": {"method": "maximize F1 on validation split", "threshold": validation_threshold, "validation_f1_at_selected_threshold": validation_best_f1},
+        "final_test_metrics_at_0_5": test_metrics_baseline,
+        "final_test_metrics": test_metrics_tuned,
+        "test_calibration_curve": [{"mean_predicted_probability": float(predicted), "observed_positive_fraction": float(observed)} for predicted, observed in zip(mean_predicted, fraction_positive)],
+        "top_encoded_feature_importance": top_encoded_feature_importance(final_pipeline),
+        "limitations": [
+            "The threshold maximizes validation F1 and is not optimized for campaign costs, customer contact capacity, or profit.",
+            "The test set is a stratified random split; temporal validation may better reflect future campaigns.",
+            "Feature importance is model-based association, not causal explanation. Review calibration, subgroup performance, privacy, and consent before operational use.",
+        ],
     }
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"pipeline": final_pipeline, "features": list(X.columns), "selected_model": best["model"], "threshold": 0.5}, MODEL_PATH)
+    joblib.dump({"pipeline": final_pipeline, "features": list(X.columns), "selected_model": best["model"], "threshold": validation_threshold}, MODEL_PATH)
     REPORT_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
     print(f"Selected model saved: {MODEL_PATH}")
