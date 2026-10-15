@@ -61,6 +61,23 @@ def test_dataset_profile_csv_is_in_memory_and_reports_quality():
     assert data["persisted"] is False
     assert data["training_triggered"] is False
     assert len(data["sample"]) == 3
+    dataset_id = data["dataset_id"]
+
+    features = client.get(f"/workflow/{dataset_id}/features")
+    assert features.status_code == 200
+    assert len(features.json()["columns"]) == 2
+
+    statistics = client.get(f"/workflow/{dataset_id}/statistics")
+    assert statistics.status_code == 200
+    assert statistics.json()["numeric_column_count"] == 1
+
+    missing = client.get(f"/workflow/{dataset_id}/missing")
+    assert missing.status_code == 200
+    assert missing.json()["missing_cells"] == 1
+
+    visualization = client.get(f"/workflow/{dataset_id}/visualization")
+    assert visualization.status_code == 200
+    assert visualization.json()["target_distribution"]["column"] == "y"
 
 
 def test_dataset_profile_rejects_unsupported_file_type():
