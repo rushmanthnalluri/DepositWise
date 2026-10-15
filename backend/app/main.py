@@ -90,6 +90,22 @@ def dashboard() -> HTMLResponse:
 
 
 
+
+MODEL_ARTIFACT_CACHE: dict[str, Any] | None = None
+MODEL_ARTIFACT_CACHE_KEY: tuple[str, int, int] | None = None
+
+
+def load_model_artifact() -> dict[str, Any]:
+    """Cache the bundled artifact so candidate models are not reloaded on every request."""
+    global MODEL_ARTIFACT_CACHE, MODEL_ARTIFACT_CACHE_KEY
+    stat = MODEL_PATH.stat()
+    key = (str(MODEL_PATH), stat.st_mtime_ns, stat.st_size)
+    if MODEL_ARTIFACT_CACHE is None or MODEL_ARTIFACT_CACHE_KEY != key:
+        MODEL_ARTIFACT_CACHE = joblib.load(MODEL_PATH)
+        MODEL_ARTIFACT_CACHE_KEY = key
+    return MODEL_ARTIFACT_CACHE
+
+
 def compute_psi(reference: list[float], observed: list[float]) -> float:
     """Population Stability Index from binned proportions, with numerical smoothing."""
     if len(reference) != len(observed) or not reference:
@@ -108,7 +124,7 @@ def metrics() -> dict[str, Any]:
     global FEATURE_REFERENCE, CATEGORICAL_REFERENCE
     if (not FEATURE_REFERENCE or not CATEGORICAL_REFERENCE) and MODEL_PATH.exists():
         try:
-            artifact = joblib.load(MODEL_PATH)
+            artifact = load_model_artifact()
             FEATURE_REFERENCE = FEATURE_REFERENCE or artifact.get("feature_reference", {})
             CATEGORICAL_REFERENCE = CATEGORICAL_REFERENCE or artifact.get("categorical_reference", {})
         except Exception:
@@ -463,7 +479,7 @@ def score_uploaded_batch(dataset_id: str, threshold: float | None = Query(defaul
     if not MODEL_PATH.exists():
         raise HTTPException(status_code=503, detail="Production model artifact is unavailable.")
     try:
-        artifact = joblib.load(MODEL_PATH)
+        artifact = load_model_artifact()
         expected = artifact["features"]
         pipeline = artifact["pipeline"]
         target_candidates = [name for name in frame.columns if str(name).strip().lower() in {"y", "target", "subscribed", "subscription"}]
@@ -514,7 +530,7 @@ def uploaded_campaign_lift(dataset_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail="Campaign lift requires both positive and negative target examples.")
     if not MODEL_PATH.exists():
         raise HTTPException(status_code=503, detail="Production model artifact is unavailable.")
-    artifact = joblib.load(MODEL_PATH)
+    artifact = load_model_artifact()
     features = artifact["features"]
     source = frame.drop(columns=[target_column, "duration"], errors="ignore")
     missing = [name for name in features if name not in source.columns]
@@ -667,7 +683,7 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
     if not MODEL_PATH.exists():
         raise HTTPException(status_code=503, detail="Model artifact is missing. Download the dataset and run: python -m ml.train")
     try:
-        artifact = joblib.load(MODEL_PATH)
+        artifact = load_model_artifact()
         if not FEATURE_REFERENCE:
             FEATURE_REFERENCE = artifact.get("feature_reference", {})
         if not CATEGORICAL_REFERENCE:
