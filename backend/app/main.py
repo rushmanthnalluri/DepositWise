@@ -311,6 +311,26 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
         categorical_target_rates.sort(key=lambda item: (item["feature"], -item["positive_rate"]))
     numeric = frame.select_dtypes(include="number")
     correlations = []
+    numeric_distributions = []
+    for column in list(numeric.columns)[:8]:
+        values = numeric[column].dropna().to_numpy(dtype=float)
+        if values.size:
+            counts, edges = np.histogram(values, bins=10)
+            numeric_distributions.append({
+                "feature": str(column),
+                "labels": [f"{edges[i]:.3g}–{edges[i + 1]:.3g}" for i in range(len(edges) - 1)],
+                "counts": [int(value) for value in counts],
+                "missing": int(numeric[column].isna().sum()),
+            })
+    categorical_distributions = []
+    for column in list(frame.select_dtypes(exclude="number").columns)[:10]:
+        counts = frame[column].fillna("<missing>").astype(str).value_counts(dropna=False).head(8)
+        categorical_distributions.append({
+            "feature": str(column),
+            "labels": [str(value) for value in counts.index],
+            "counts": [int(value) for value in counts.values],
+            "other_count": max(0, int(frame[column].notna().sum()) - int(counts.sum())),
+        })
     if len(numeric.columns) > 1:
         corr = numeric.corr(numeric_only=True).fillna(0)
         names = list(corr.columns)
@@ -318,7 +338,14 @@ def uploaded_visualization_summary(dataset_id: str) -> dict[str, Any]:
             for other in names[i + 1:]:
                 correlations.append({"feature_a": str(column), "feature_b": str(other), "correlation": float(corr.loc[column, other])})
         correlations.sort(key=lambda item: abs(item["correlation"]), reverse=True)
-    return {"dataset_id": dataset_id, "target_distribution": target, "categorical_target_rates": categorical_target_rates[:200], "top_numeric_correlations": correlations[:30]}
+    return {
+        "dataset_id": dataset_id,
+        "target_distribution": target,
+        "categorical_target_rates": categorical_target_rates[:200],
+        "numeric_distributions": numeric_distributions,
+        "categorical_distributions": categorical_distributions,
+        "top_numeric_correlations": correlations[:30],
+    }
 
 
 
