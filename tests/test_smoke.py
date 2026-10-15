@@ -177,6 +177,7 @@ def test_predict_returns_baseline_sensitivity_and_honors_threshold(tmp_path, mon
         "selected_model": "logistic_regression",
         "candidate_pipelines": {"logistic_regression": pipeline},
         "candidate_thresholds": {"logistic_regression": 0.4},
+        "explanation_background": X.copy(),
         "threshold": 0.5,
         "baseline_customer": {"age": 29.5, "balance": 195.0, "job": "admin."},
     }, model_path)
@@ -196,9 +197,9 @@ def test_predict_returns_baseline_sensitivity_and_honors_threshold(tmp_path, mon
     event = json.loads(prediction_log.read_text(encoding="utf-8").splitlines()[-1])
     assert "customer" not in event and "customer_features" not in event
     assert event["selected_model"] == "logistic_regression"
-    assert result["explanation_method"].startswith("single-feature baseline sensitivity")
+    assert result["explanation_method"].startswith("SHAP")
     assert len(result["top_feature_impacts"]) <= 5
-    assert all("impact_probability" in item for item in result["top_feature_impacts"])
+    assert all("impact_value" in item and "impact_unit" in item for item in result["top_feature_impacts"])
 
 
 def test_psi_detects_distribution_shift_without_storing_raw_rows():
